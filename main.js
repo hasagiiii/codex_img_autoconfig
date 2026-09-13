@@ -5,6 +5,7 @@ const http = require('http');
 const path = require('path');
 const os = require('os');
 const { execFile } = require('child_process');
+const { promisify } = require('util');
 const dns = require('dns');
 const { autoUpdater } = require('electron-updater');
 
@@ -40,6 +41,8 @@ const CONFIG_CANDIDATES = [
   path.join(process.env.APPDATA || '', 'OpenAI', 'Codex', 'config.toml')
 ].filter(Boolean);
 const CONFIG_GROUP_FILES = ['auth.json', 'config.toml', '.env'];
+const execFileAsync = promisify(execFile);
+const CHATGPT_PROCESS_NAME = 'ChatGPT.exe';
 
 let mainWindow;
 let activeLoginServer;
@@ -708,13 +711,61 @@ ipcMain.handle('auth:open-last-url', async () => {
   await shell.openExternal(lastAuthorizationUrl);
   return { ok: true, url: lastAuthorizationUrl };
 });
-ipcMain.handle('codex:restart', async () => new Promise((resolve) => {
-  execFile('taskkill.exe', ['/IM', 'codex.exe', '/T', '/F'], { windowsHide: true }, (_error) => {
-    execFile('codex.exe', [], { windowsHide: true }, (startError) => {
-      resolve({ restarted: !startError });
-    });
-  });
-}));
+async function findRunningChatGPT() {
+  if (process.platform !== 'win32') return null;
+  try {
+    const command = "(Get-Process -Name 'ChatGPT' -ErrorAction SilentlyContinue | Select-Object -First 1).Id";
+    const { stdout } = await execFileAsync('powershell.exe', [
+      '-NoProfile', '-NonInteractive', '-Command', command
+    ], { windowsHide: true });
+    return stdout.trim() ? { processName: CHATGPT_PROCESS_NAME } : null;
+  } catch {
+    return null;
+  }
+}
+
+async function waitForChatGPTStart(timeoutMs = 8000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await findRunningChatGPT()) return true;
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+  return Boolean(await findRunningChatGPT());
+}
+
+async function startChatGPT() {
+  try {
+    await shell.openExternal('codex://');
+    return waitForChatGPTStart();
+  } catch {
+    return false;
+  }
+}
+
+async function waitForChatGPTExit(timeoutMs = 5000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!(await findRunningChatGPT())) return true;
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
+  return !(await findRunningChatGPT());
+}
+
+ipcMain.handle('codex:restart', async () => {
+  const runningChatGPT = await findRunningChatGPT();
+  if (runningChatGPT) {
+    try {
+      await execFileAsync('taskkill.exe', ['/IM', CHATGPT_PROCESS_NAME, '/T', '/F'], { windowsHide: true });
+    } catch {
+      // The process may have exited between detection and taskkill.
+    }
+    if (!(await waitForChatGPTExit())) {
+      return { restarted: false, started: false, processName: CHATGPT_PROCESS_NAME };
+    }
+  }
+  const startedChatGPT = await startChatGPT();
+  return { restarted: startedChatGPT, started: startedChatGPT, processName: CHATGPT_PROCESS_NAME };
+});
 ipcMain.handle('update:status', () => updateState);
 ipcMain.handle('update:check', checkForUpdates);
 ipcMain.handle('update:download', downloadUpdate);

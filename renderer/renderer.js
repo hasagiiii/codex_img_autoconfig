@@ -753,6 +753,23 @@ document.querySelector('#copy-callback').addEventListener('click', async () => {
   await navigator.clipboard.writeText(document.querySelector('#oidc-redirect-uri').value);
   showToast('回调地址已复制');
 });
+document.querySelector('#restart-codex').addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  if (button.disabled) return;
+  button.disabled = true;
+  button.setAttribute('aria-busy', 'true');
+  try {
+    const result = await api.codex.restart();
+    showToast(result.restarted
+      ? 'ChatGPT/Codex 已重启'
+      : '未能启动 Codex 或 ChatGPT');
+  } catch (error) {
+    showToast(`重启 Codex 失败：${error.message}`, true);
+  } finally {
+    button.disabled = false;
+    button.removeAttribute('aria-busy');
+  }
+});
 document.querySelector('#login-button').addEventListener('click', login);
 document.querySelector('#api-key-login').addEventListener('click', showLoginDialog);
 document.querySelector('#nav-login').addEventListener('click', showLoginDialog);

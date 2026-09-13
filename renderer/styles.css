@@ -78,6 +78,9 @@ button { cursor: pointer; }
 .button-secondary { color: #cad4d7; }
 .button-danger { border-color: #774b49; color: #ffd9d6; background: #362221; }
 .button-large { min-width: 168px; min-height: 42px; }
+.api-key-action-buttons { display: flex; gap: 9px; flex-wrap: nowrap; }
+.compact-action-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; width: 68px; height: 28px; min-height: 28px; padding: 0; font-size: 12px; font-weight: 500; }
+.compact-action-button .codicon { font-size: 14px; }
 .view { display: none; min-height: 0; flex: 1; }
 .view.active { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 
@@ -136,8 +139,6 @@ button { cursor: pointer; }
 .combo-menu { position: absolute; z-index: 20; top: 32px; left: 0; right: 0; padding: 3px; border: 1px solid var(--line-strong); border-radius: 4px; background: #182126; box-shadow: 0 8px 20px #0008; }
 .combo-menu button { display: block; width: 100%; padding: 7px 8px; border: 0; color: var(--text); background: transparent; text-align: left; font: 10px Consolas, monospace; cursor: pointer; }
 .combo-menu button:hover { background: #29423d; }
-.apply-api-key { display: inline-flex; align-items: center; justify-content: center; gap: 6px; width: 68px; height: 28px; min-height: 28px; padding: 0; font-size: 12px; font-weight: 500; }
-.apply-api-key .codicon { font-size: 14px; }
 .picker-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; color: #cbd5d8; font-size: 12px; font-weight: 650; }
 .icon-button.small { width: 25px; height: 24px; font-size: 14px; }
 .api-key-picker small, .api-key-status { display: block; margin-top: 7px; color: var(--muted); font-size: 10px; line-height: 1.45; }
