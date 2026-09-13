@@ -150,9 +150,7 @@ async function applyApiKey() {
     const [authSource, tomlSource, envSource] = await Promise.all([
       fileDraft(authFile), fileDraft(tomlFile), fileDraft(envFile)
     ]);
-    const selectedBaseUrl = document.querySelector('#base-url-select').value === 'custom'
-      ? document.querySelector('#base-url-custom').value.trim()
-      : document.querySelector('#base-url-select').value;
+    const selectedBaseUrl = document.querySelector('#base-url-input').value.trim();
     baseUrl = selectedBaseUrl;
     const authData = parseAuth(authSource.content);
     authData.OPENAI_API_KEY = key;
