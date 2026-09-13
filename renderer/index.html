@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; worker-src 'self' blob:" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OpenTk</title>
+    <link rel="stylesheet" href="../node_modules/monaco-editor/esm/vs/base/browser/ui/codicons/codicon/codicon.css" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="windowbar">
+        <div class="window-title">OpenTk</div>
+        <div class="window-controls">
+          <button class="window-control" id="window-minimize" title="最小化">−</button>
+          <button class="window-control" id="window-maximize" title="最大化">□</button>
+          <button class="window-control close" id="window-close" title="关闭">×</button>
+        </div>
+      </header>
+      <aside class="app-nav">
+        <div class="brand">
+          <div class="brand-mark">C</div>
+          <div>
+            <strong>OpenTk</strong>
+            <span>Codex配置工具</span>
+          </div>
+        </div>
+
+        <nav class="nav-list" aria-label="主导航">
+          <div class="nav-section-title">Codex配置</div>
+          <button class="nav-item active" data-view="codex-view">
+            <span class="nav-icon">⌘</span><span>Codex配置</span>
+          </button>
+        </nav>
+
+        <div class="nav-footer">
+          <div class="nav-bottom-links">
+            <button class="nav-login" id="nav-login" aria-haspopup="dialog" aria-controls="login-dialog"><span class="nav-icon codicon codicon-sign-in" aria-hidden="true"></span><span>登录</span></button>
+            <button class="nav-login" data-view="oidc-view"><span class="nav-icon codicon codicon-settings-gear" aria-hidden="true"></span><span>设置</span></button>
+          </div>
+          <div class="nav-account-wrap hidden" id="nav-account-wrap">
+            <button class="nav-account" id="nav-account" title="打开账户菜单" aria-haspopup="menu" aria-expanded="false">
+              <div class="nav-avatar" id="nav-avatar">U</div>
+              <span id="nav-account-name">未登录</span>
+            </button>
+            <div class="account-menu hidden" id="account-menu" role="menu">
+              <button class="account-menu-item" id="account-logout" type="button" role="menuitem">退出登录</button>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="page-header">
+          <div>
+            <h1 id="page-title">Codex配置</h1>
+            <p id="page-caption">读取和编辑本机 Codex 配置文件</p>
+          </div>
+          <div class="header-actions" id="file-actions">
+            <button class="button button-secondary" id="choose-file">打开文件</button>
+            <button class="button button-primary" id="save-config">保存配置</button>
+          </div>
+        </header>
+
+        <section class="view active" id="codex-view">
+          <section class="config-panel active" id="codex-panel">
+            <div class="codex-layout">
+              <aside class="file-inspector">
+                <div class="file-inspector-details">
+                <div class="section-kicker">当前文件</div>
+                <div class="file-status">
+                  <span class="status-dot" id="status-dot"></span>
+                  <span id="config-state">读取中</span>
+                </div>
+                <div class="config-file-list editor-file-list" id="config-file-list" aria-label="Codex 配置文件">
+                  <div class="file-list-loading">正在读取文件...</div>
+                </div>
+                <div class="file-path" id="config-path">正在定位...</div>
+
+                <dl class="file-meta">
+                  <div><dt>格式</dt><dd id="config-format">-</dd></div>
+                  <div><dt>大小</dt><dd id="config-size">-</dd></div>
+                  <div><dt>编辑状态</dt><dd id="dirty-state">未修改</dd></div>
+                </dl>
+
+                <button class="text-button" id="open-folder">在文件夹中查看</button>
+                <div class="api-key-picker">
+                  <div class="api-key-form-row">
+                    <span class="api-key-field-name">来源</span>
+                    <div class="api-key-mode" role="tablist" aria-label="API Key 来源">
+                      <button class="active" id="api-key-mode-provider" type="button" role="tab" aria-selected="true">OpenTk</button>
+                      <button id="api-key-mode-manual" type="button" role="tab" aria-selected="false">手动输入</button>
+                    </div>
+                  </div>
+                  <div class="api-key-form-row">
+                    <label class="api-key-field-name" for="manual-api-key">API Key</label>
+                    <div class="api-key-value">
+                      <div class="hidden" id="api-key-manual-panel" role="tabpanel">
+                        <input id="manual-api-key" type="text" placeholder="输入 API Key" aria-label="API Key" autocomplete="off" spellcheck="false" disabled>
+                      </div>
+                      <div id="api-key-provider-panel" role="tabpanel">
+                        <button class="button button-secondary api-key-login" id="api-key-login" type="button" aria-haspopup="dialog" aria-controls="login-dialog"><span class="codicon codicon-sign-in" aria-hidden="true"></span>登录</button>
+                        <div class="provider-key-control hidden" id="api-key-controls">
+                          <select id="api-key-select" aria-label="Provider API Key" disabled>
+                            <option value="">正在读取...</option>
+                          </select>
+                          <button class="icon-button small" id="copy-api-key" type="button" title="复制 API Key" aria-label="复制 API Key" disabled><span class="codicon codicon-copy" aria-hidden="true"></span></button>
+                          <button class="icon-button small hidden" id="refresh-api-keys" type="button" title="刷新 Provider API Key" aria-label="刷新 Provider API Key"><span class="codicon codicon-refresh" aria-hidden="true"></span></button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="api-key-form-row api-key-message-row">
+                    <span></span>
+                    <div>
+                      <small id="manual-key-status" role="status"></small>
+                      <pre class="api-key-status hidden" id="api-key-status">API Key 将从 OIDC Resource API 获取</pre>
+                    </div>
+                  </div>
+                  <div class="api-key-form-row api-key-action-row">
+                    <span></span>
+                    <button class="button button-primary apply-api-key" id="apply-api-key" type="button" disabled><span class="codicon codicon-run" aria-hidden="true"></span>应用</button>
+                  </div>
+                </div>
+                </div>
+              </aside>
+
+              <div class="editor-area">
+                <div class="editor-toolbar">
+                  <div>
+                    <strong>配置内容</strong>
+                    <span id="editor-subtitle">加载后即可编辑</span>
+                  </div>
+                  <div class="editor-toolbar-actions">
+                    <button class="icon-button hidden" id="close-diff" title="返回编辑器">←</button>
+                    <button class="icon-button" id="reload-config" title="重新读取配置">↻</button>
+                    <div class="history-control" id="history-control">
+                      <button class="history-toggle" id="history-toggle" type="button" aria-expanded="false" aria-controls="history-panel">历史版本 <span class="history-count" id="history-count" aria-live="polite">-</span></button>
+                      <section class="history-panel hidden" id="history-panel" aria-label="历史版本">
+                        <div class="picker-heading"><strong>历史版本</strong><button class="icon-button small" id="refresh-backups" title="刷新历史版本">↻</button></div>
+                        <div class="history-columns" aria-hidden="true"><span>文件名</span><span>时间</span><span>操作</span></div>
+                        <div class="backup-list" id="backup-list"><div class="backup-empty">暂无历史版本</div></div>
+                      </section>
+                    </div>
+                  </div>
+                </div>
+                <div class="editor-frame" id="editor-frame">
+                  <div id="config-editor" aria-label="Codex 配置内容"></div>
+                </div>
+                <div class="diff-editor-frame hidden" id="diff-editor-frame">
+                  <div class="diff-file-headers">
+                        <header>
+                          <strong>OpenTk 备份</strong>
+                          <span id="diff-backup-meta"></span>
+                        </header>
+                        <header>
+                          <strong>当前配置</strong>
+                          <span id="diff-current-meta"></span>
+                        </header>
+                  </div>
+                  <div id="monaco-diff" aria-label="历史版本与当前配置差异"></div>
+                  <div id="diff-horizontal-scroll" tabindex="0" aria-label="差异编辑器横向滚动"><div id="diff-horizontal-spacer"></div></div>
+                  <footer class="diff-editor-footer">
+                    <button class="button button-secondary" id="restore-backup" type="button">恢复备份</button>
+                    <span id="diff-status"></span>
+                  </footer>
+                </div>
+                <footer class="editor-footer">
+                  <span id="cursor-position">第 1 行，第 1 列</span>
+                  <span>Ctrl / Cmd + S 保存</span>
+                </footer>
+              </div>
+            </div>
+        </section>
+        </section>
+
+        <section class="view" id="oidc-view">
+          <section class="config-panel active" id="oidc-panel">
+            <div class="settings-heading">
+              <div>
+                <h2>OIDC Provider</h2>
+                <p>使用 Authorization Code + PKCE，通过系统浏览器完成登录。</p>
+              </div>
+              <button class="button button-primary" id="save-oidc">保存 OIDC 配置</button>
+            </div>
+
+            <form class="settings-form" id="oidc-form">
+              <label class="field field-wide">
+                <span>Issuer URL</span>
+                <input id="oidc-issuer" type="url" placeholder="https://identity.example.com" autocomplete="off" />
+                <small>应用会通过 Issuer 自动发现授权端点和 Token 端点。</small>
+              </label>
+
+              <label class="field">
+                <span>Client ID</span>
+                <input id="oidc-client-id" type="text" placeholder="desktop-client" autocomplete="off" />
+              </label>
+
+              <div class="field">
+                <span>客户端认证方式</span>
+                <div class="readonly-field">none + PKCE (S256)</div>
+                <small>桌面端作为 Public Client，使用 PKCE S256 完成授权。</small>
+              </div>
+
+              <label class="field field-wide">
+                <span>Scopes</span>
+                <input id="oidc-scopes" type="text" value="openid profile email" />
+              </label>
+
+              <label class="field field-wide">
+                <span>本地回调地址</span>
+                <div class="input-action">
+                  <input id="oidc-redirect-uri" type="url" value="http://localhost:53682/oauth/callback" />
+                  <button class="inline-button" id="copy-callback" type="button">复制</button>
+                </div>
+                <small>请把此地址加入 Provider 的 Allowed Redirect URIs。</small>
+              </label>
+
+              <section class="update-settings field-wide" aria-labelledby="update-heading">
+                <div class="update-copy">
+                  <span id="update-heading">应用更新</span>
+                  <strong id="update-status">正在读取版本信息</strong>
+                  <small id="update-version">当前版本：-</small>
+                </div>
+                <div class="update-progress hidden" id="update-progress" aria-label="更新下载进度">
+                  <div id="update-progress-bar"></div>
+                </div>
+                <div class="update-actions">
+                  <button class="button button-secondary" id="check-update" type="button">检查更新</button>
+                  <button class="button button-primary hidden" id="download-update" type="button">下载更新</button>
+                  <button class="button button-primary hidden" id="install-update" type="button">重启并安装</button>
+                </div>
+              </section>
+            </form>
+          </section>
+        </section>
+
+      </main>
+
+        <dialog class="login-dialog" id="login-dialog" aria-labelledby="login-dialog-title">
+          <header class="login-dialog-header">
+            <strong id="login-dialog-title">登录</strong>
+            <button class="icon-button" id="close-login" type="button" title="关闭登录" aria-label="关闭登录">×</button>
+          </header>
+          <div class="login-layout">
+            <section class="login-primary">
+              <div class="section-kicker">账户访问</div>
+              <h2 id="login-heading">连接你的身份账户</h2>
+              <p id="login-description">登录将在系统默认浏览器中打开，授权完成后自动返回此应用。</p>
+
+              <div class="account-block hidden" id="account-block">
+                <div class="account-avatar" id="account-avatar">U</div>
+                <div>
+                  <strong id="account-name">-</strong>
+                  <span id="account-email">-</span>
+                </div>
+              </div>
+
+              <div class="login-actions">
+                <button class="button button-primary button-large" id="login-button">使用 OIDC 登录</button>
+                <button class="button button-secondary button-large" id="manual-login-button">手动打开 Provider</button>
+                <button class="button button-danger hidden" id="logout-button">退出登录</button>
+              </div>
+              <div class="login-message" id="login-message"></div>
+            </section>
+
+            <aside class="provider-summary">
+              <div class="section-kicker">当前 Provider</div>
+              <dl>
+                <div><dt>Issuer</dt><dd id="summary-issuer">尚未配置</dd></div>
+                <div><dt>Client ID</dt><dd id="summary-client-id">-</dd></div>
+                <div><dt>回调地址</dt><dd id="summary-redirect-uri">http://localhost:53682/oauth/callback</dd></div>
+                <div><dt>会话状态</dt><dd id="summary-auth-status">未登录</dd></div>
+              </dl>
+              <button class="text-button" id="go-oidc-settings">打开 OIDC 配置</button>
+            </aside>
+          </div>
+        </dialog>
+
+      <div class="toast" id="toast" role="status"></div>
+    </div>
+    <script src="../node_modules/monaco-editor/min/vs/loader.js"></script>
+    <script src="./editor-languages.js"></script>
+    <script src="./config-apply.js"></script>
+    <script src="./config-diff.js"></script>
+    <script src="./config-editor.js"></script>
+    <script src="./renderer.js"></script>
+  </body>
+</html>

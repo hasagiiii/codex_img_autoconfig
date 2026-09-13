@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Build artifacts
+dist/
+release/
+*.exe
+*.blockmap
+
+# Test and runtime output
+.test-output/
+.runtime-data/
+.npm-cache/
+*.log
+
+# Local configuration and secrets
+.env
+*.opentk-backup-*
+
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

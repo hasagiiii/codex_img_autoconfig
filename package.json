@@ -1,0 +1,71 @@
+{
+  "name": "codex-config-studio",
+  "version": "0.1.0",
+  "description": "Desktop editor for the Codex configuration file",
+  "author": "OpenTk",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hasagiiii/codex_img_autoconfig.git"
+  },
+  "main": "main.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "test": "node --test scripts/backups.test.cjs scripts/auth-refresh.test.cjs scripts/update.test.cjs",
+    "build:win": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-win.ps1",
+    "build:win:installer": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-win.ps1 -Target nsis",
+    "release:github": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-win.ps1 -Target nsis -Publish"
+  },
+  "devDependencies": {
+    "electron": "^31.0.2",
+    "electron-builder": "^24.13.3"
+  },
+  "dependencies": {
+    "electron-updater": "^6.1.8",
+    "monaco-editor": "^0.56.0",
+    "openid-client": "^6.8.1"
+  },
+  "build": {
+    "appId": "ai.opentk.codex-config-tool",
+    "productName": "OpenTk Codex配置工具",
+    "asar": true,
+    "npmRebuild": false,
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "package.json"
+    ],
+    "win": {
+      "signAndEditExecutable": false,
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "portable": {
+      "artifactName": "OpenTk-Codex-Config-Tool-${version}-${arch}-portable.${ext}"
+    },
+    "nsis": {
+      "artifactName": "OpenTk-Codex-Config-Tool-${version}-${arch}-setup.${ext}",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "hasagiiii",
+      "repo": "codex_img_autoconfig",
+      "releaseType": "release"
+    }
+  }
+}
