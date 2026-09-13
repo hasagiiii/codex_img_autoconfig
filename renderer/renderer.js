@@ -49,12 +49,7 @@ function extractBaseUrl(content) {
 
 function renderBaseUrl(value) {
   baseUrl = value || 'https://opentk.ai';
-  const select = document.querySelector('#base-url-select');
-  const custom = document.querySelector('#base-url-custom');
-  const preset = [...select.options].find((option) => option.value === baseUrl);
-  select.value = preset ? baseUrl : 'custom';
-  custom.value = preset ? '' : baseUrl;
-  custom.classList.toggle('hidden', select.value !== 'custom');
+  document.querySelector('#base-url-input').value = baseUrl;
 }
 
 function renderApiKeyMode() {
@@ -714,10 +709,8 @@ document.querySelector('#manual-api-key').addEventListener('input', (event) => {
   setManualKey(event.target.value);
 });
 document.querySelector('#apply-api-key').addEventListener('click', applyApiKey);
-document.querySelector('#base-url-select').addEventListener('change', (event) => {
-  const custom = document.querySelector('#base-url-custom');
-  custom.classList.toggle('hidden', event.target.value !== 'custom');
-  if (event.target.value !== 'custom') baseUrl = event.target.value;
+document.querySelector('#base-url-input').addEventListener('input', (event) => {
+  baseUrl = event.target.value.trim();
 });
 document.querySelector('#restore-backup').addEventListener('click', () => {
   if (!activeBackup) return;

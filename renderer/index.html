@@ -86,7 +86,16 @@
 
                 <button class="text-button" id="open-folder">在文件夹中查看</button>
                 <div class="api-key-picker">
-                  <div class="api-key-form-row">
+                  <div class="api-key-form-row base-url-row">
+                    <label class="api-key-field-name" for="base-url-input">Base URL</label>
+                    <div class="base-url-control">
+                      <input id="base-url-input" list="base-url-options" type="url" placeholder="https://example.com" aria-label="Base URL">
+                      <datalist id="base-url-options">
+                        <option value="https://opentk.ai"></option><option value="https://api.opentk.ai"></option><option value="https://hk.opentk.ai"></option>
+                      </datalist>
+                    </div>
+                  </div>
+                  <div class="api-key-form-row source-row">
                     <span class="api-key-field-name">来源</span>
                     <div class="api-key-mode" role="tablist" aria-label="API Key 来源">
                       <button class="active" id="api-key-mode-provider" type="button" role="tab" aria-selected="true">OpenTk</button>
@@ -116,18 +125,6 @@
                     <div>
                       <small id="manual-key-status" role="status"></small>
                       <pre class="api-key-status hidden" id="api-key-status">API Key 将从 OIDC Resource API 获取</pre>
-                    </div>
-                  </div>
-                  <div class="api-key-form-row base-url-row">
-                    <label class="api-key-field-name" for="base-url-select">Base URL</label>
-                    <div class="base-url-control">
-                      <select id="base-url-select" aria-label="Base URL">
-                        <option value="https://opentk.ai">https://opentk.ai</option>
-                        <option value="https://api.opentk.ai">https://api.opentk.ai</option>
-                        <option value="https://hk.opentk.ai">https://hk.opentk.ai</option>
-                        <option value="custom">自定义</option>
-                      </select>
-                      <input id="base-url-custom" class="hidden" type="url" placeholder="https://example.com" aria-label="自定义 Base URL">
                     </div>
                   </div>
                   <div class="api-key-form-row api-key-action-row">
