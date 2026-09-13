@@ -114,8 +114,10 @@ button { cursor: pointer; }
 .api-key-mode button:hover { color: var(--text); }
 .api-key-mode button.active { color: #dff8f0; background: #263a35; }
 #api-key-manual-panel input { height: 30px; padding: 0 8px; font: 11px Consolas, monospace; }
-.provider-key-control { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) 28px 28px; gap: 4px; }
+.provider-key-control { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) 28px 28px 28px; gap: 4px; position: relative; }
+.provider-key-control > #api-key-input { height: 30px; min-width: 0; padding: 0 7px; font: 10px Consolas, monospace; }
 .provider-key-control select { height: 30px; padding: 0 7px; border-radius: 4px; font-size: 10px; }
+.provider-key-control select { display: none; }
 .provider-key-control .icon-button.small { width: 28px; height: 30px; }
 .api-key-message-row { align-items: start; margin-top: -2px; margin-bottom: 7px; }
 .api-key-message-row > div { min-width: 0; }
@@ -124,9 +126,12 @@ button { cursor: pointer; }
 .api-key-action-row { margin-bottom: 0; }
 .base-url-row { margin-top: 0; padding-top: 0; border-top: 0; }
 .source-row { display: none; }
-.base-url-control { min-width: 0; display: flex; gap: 5px; }
+.base-url-control { min-width: 0; display: flex; gap: 0; position: relative; }
 .base-url-control input { flex: 1; height: 30px; min-width: 0; padding: 0 7px; font: 10px Consolas, monospace; }
-.base-url-control input[list] { appearance: auto; }
+.combo-toggle { width: 28px; height: 30px; border: 1px solid var(--line); border-left: 0; border-radius: 0 4px 4px 0; color: var(--muted); background: var(--surface-2); cursor: pointer; }
+.combo-menu { position: absolute; z-index: 20; top: 32px; left: 0; right: 0; padding: 3px; border: 1px solid var(--line-strong); border-radius: 4px; background: #182126; box-shadow: 0 8px 20px #0008; }
+.combo-menu button { display: block; width: 100%; padding: 7px 8px; border: 0; color: var(--text); background: transparent; text-align: left; font: 10px Consolas, monospace; cursor: pointer; }
+.combo-menu button:hover { background: #29423d; }
 .apply-api-key { display: inline-flex; align-items: center; justify-content: center; gap: 6px; width: 68px; height: 28px; min-height: 28px; padding: 0; font-size: 12px; font-weight: 500; }
 .apply-api-key .codicon { font-size: 14px; }
 .picker-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; color: #cbd5d8; font-size: 12px; font-weight: 650; }

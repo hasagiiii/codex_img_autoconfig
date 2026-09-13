@@ -58,9 +58,9 @@ function renderApiKeyMode() {
   document.querySelector('#api-key-mode-provider').setAttribute('aria-selected', String(provider));
   document.querySelector('#api-key-mode-manual').classList.toggle('active', !provider);
   document.querySelector('#api-key-mode-manual').setAttribute('aria-selected', String(!provider));
-  document.querySelector('#api-key-provider-panel').classList.toggle('hidden', !provider);
-  document.querySelector('#api-key-manual-panel').classList.toggle('hidden', provider);
-  document.querySelector('#api-key-status').classList.toggle('hidden', !provider || !authenticated);
+  document.querySelector('#api-key-provider-panel').classList.remove('hidden');
+  document.querySelector('#api-key-manual-panel').classList.add('hidden');
+  document.querySelector('#api-key-status').classList.toggle('hidden', !authenticated);
 }
 
 function setApiKeyMode(mode, touched = true) {
@@ -71,6 +71,7 @@ function setApiKeyMode(mode, touched = true) {
 
 function syncManualKey() {
   const input = document.querySelector('#manual-api-key');
+  const comboInput = document.querySelector('#api-key-input');
   const status = document.querySelector('#manual-key-status');
   const draft = authDraft();
   input.disabled = !draft;
@@ -80,6 +81,7 @@ function syncManualKey() {
   try {
     const data = parseAuth(draft.content);
     input.value = typeof data.OPENAI_API_KEY === 'string' ? data.OPENAI_API_KEY : '';
+    comboInput.value = input.value;
     const selected = apiKeys.find((key) => key.value === input.value);
     document.querySelector('#api-key-select').value = selected?.id || '';
     document.querySelector('#copy-api-key').disabled = !selected?.value;
@@ -478,6 +480,8 @@ function renderApiKeys(keys) {
   apiKeys = Array.isArray(keys) ? keys : [];
   const select = document.querySelector('#api-key-select');
   const copyButton = document.querySelector('#copy-api-key');
+  const menu = document.querySelector('#api-key-menu');
+  menu.innerHTML = '';
   select.innerHTML = '';
   if (!apiKeys.length) {
     select.add(new Option('没有可用 API Key', ''));
@@ -489,6 +493,18 @@ function renderApiKeys(keys) {
   }
   select.add(new Option('选择 Provider API Key', ''));
   apiKeys.forEach((key) => select.add(new Option(key.label, key.id)));
+  apiKeys.forEach((key) => {
+    const option = document.createElement('button');
+    option.type = 'button'; option.role = 'option'; option.dataset.keyId = key.id;
+    option.textContent = key.label;
+    option.addEventListener('click', () => {
+      document.querySelector('#api-key-input').value = key.value;
+      setManualKey(key.value);
+      menu.classList.add('hidden');
+      document.querySelector('#api-key-toggle').setAttribute('aria-expanded', 'false');
+    });
+    menu.append(option);
+  });
   select.disabled = false;
   copyButton.disabled = true;
   syncManualKey();
@@ -709,6 +725,29 @@ document.querySelector('#manual-api-key').addEventListener('input', (event) => {
 document.querySelector('#apply-api-key').addEventListener('click', applyApiKey);
 document.querySelector('#base-url-input').addEventListener('input', (event) => {
   baseUrl = event.target.value.trim();
+});
+document.querySelector('#base-url-toggle').addEventListener('click', () => {
+  const menu = document.querySelector('#base-url-menu');
+  const open = menu.classList.contains('hidden');
+  menu.classList.toggle('hidden', !open);
+  document.querySelector('#base-url-toggle').setAttribute('aria-expanded', String(open));
+});
+document.querySelectorAll('#base-url-menu [data-value]').forEach((item) => item.addEventListener('click', () => {
+  const value = item.dataset.value;
+  document.querySelector('#base-url-input').value = value;
+  baseUrl = value;
+  document.querySelector('#base-url-menu').classList.add('hidden');
+  document.querySelector('#base-url-toggle').setAttribute('aria-expanded', 'false');
+}));
+document.querySelector('#api-key-toggle').addEventListener('click', () => {
+  const menu = document.querySelector('#api-key-menu');
+  const open = menu.classList.contains('hidden');
+  menu.classList.toggle('hidden', !open);
+  document.querySelector('#api-key-toggle').setAttribute('aria-expanded', String(open));
+});
+document.querySelector('#api-key-input').addEventListener('input', (event) => {
+  setApiKeyMode('manual');
+  setManualKey(event.target.value);
 });
 document.querySelector('#restore-backup').addEventListener('click', () => {
   if (!activeBackup) return;

@@ -89,10 +89,13 @@
                   <div class="api-key-form-row base-url-row">
                     <label class="api-key-field-name" for="base-url-input">Base URL</label>
                     <div class="base-url-control">
-                      <input id="base-url-input" list="base-url-options" type="url" placeholder="https://example.com" aria-label="Base URL">
-                      <datalist id="base-url-options">
-                        <option value="https://opentk.ai"></option><option value="https://api.opentk.ai"></option><option value="https://hk.opentk.ai"></option>
-                      </datalist>
+                      <input id="base-url-input" type="url" placeholder="https://example.com" aria-label="Base URL">
+                      <button class="combo-toggle" id="base-url-toggle" type="button" aria-label="选择 Base URL" aria-expanded="false">⌄</button>
+                      <div class="combo-menu hidden" id="base-url-menu" role="listbox">
+                        <button type="button" role="option" data-value="https://opentk.ai">https://opentk.ai</button>
+                        <button type="button" role="option" data-value="https://api.opentk.ai">https://api.opentk.ai</button>
+                        <button type="button" role="option" data-value="https://hk.opentk.ai">https://hk.opentk.ai</button>
+                      </div>
                     </div>
                   </div>
                   <div class="api-key-form-row source-row">
@@ -111,6 +114,9 @@
                       <div id="api-key-provider-panel" role="tabpanel">
                         <button class="button button-secondary api-key-login" id="api-key-login" type="button" aria-haspopup="dialog" aria-controls="login-dialog"><span class="codicon codicon-sign-in" aria-hidden="true"></span>登录</button>
                         <div class="provider-key-control hidden" id="api-key-controls">
+                          <input id="api-key-input" type="text" placeholder="输入或选择 API Key" aria-label="API Key" autocomplete="off" spellcheck="false">
+                          <button class="combo-toggle" id="api-key-toggle" type="button" aria-label="选择 API Key" aria-expanded="false">⌄</button>
+                          <div class="combo-menu hidden" id="api-key-menu" role="listbox"></div>
                           <select id="api-key-select" aria-label="Provider API Key" disabled>
                             <option value="">正在读取...</option>
                           </select>
