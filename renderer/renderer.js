@@ -84,7 +84,6 @@ function syncManualKey() {
     comboInput.value = input.value;
     const selected = apiKeys.find((key) => key.value === input.value);
     document.querySelector('#api-key-select').value = selected?.id || '';
-    document.querySelector('#copy-api-key').disabled = !selected?.value;
     applyButton.disabled = !input.value;
     const thirdParty = providerKeysLoaded && input.value && !selected;
     if (thirdParty || (!apiKeyModeTouched && input.value && !providerKeysLoaded)) setApiKeyMode('manual', false);
@@ -479,14 +478,12 @@ async function saveConfig() {
 function renderApiKeys(keys) {
   apiKeys = Array.isArray(keys) ? keys : [];
   const select = document.querySelector('#api-key-select');
-  const copyButton = document.querySelector('#copy-api-key');
   const menu = document.querySelector('#api-key-menu');
   menu.innerHTML = '';
   select.innerHTML = '';
   if (!apiKeys.length) {
     select.add(new Option('没有可用 API Key', ''));
     select.disabled = true;
-    copyButton.disabled = true;
     document.querySelector('#api-key-status').textContent = 'Provider 没有返回 API Key。';
     syncManualKey();
     return;
@@ -506,7 +503,6 @@ function renderApiKeys(keys) {
     menu.append(option);
   });
   select.disabled = false;
-  copyButton.disabled = true;
   syncManualKey();
   document.querySelector('#api-key-status').textContent = `已加载 ${apiKeys.length} 个 API Key。`;
 }
@@ -525,7 +521,6 @@ async function loadApiKeys() {
   } catch (error) {
     if (request !== apiKeyRequest || !authenticated) return;
     document.querySelector('#api-key-select').disabled = true;
-    document.querySelector('#copy-api-key').disabled = true;
     status.textContent = error.message;
   }
 }
@@ -715,7 +710,6 @@ document.querySelector('#api-key-mode-manual').addEventListener('click', () => s
 document.querySelector('#api-key-select').addEventListener('change', () => {
   setApiKeyMode('provider');
   const selected = apiKeys.find((key) => key.id === document.querySelector('#api-key-select').value);
-  document.querySelector('#copy-api-key').disabled = !selected?.value;
   if (selected?.value) setManualKey(selected.value);
 });
 document.querySelector('#manual-api-key').addEventListener('input', (event) => {
@@ -754,12 +748,6 @@ document.querySelector('#restore-backup').addEventListener('click', () => {
   diffView?.restore(activeBackup.content);
   document.querySelector('#diff-status').textContent = '已载入备份内容，请点击保存配置写入当前文件';
   showToast('备份内容已载入右侧编辑器');
-});
-document.querySelector('#copy-api-key').addEventListener('click', async () => {
-  const selected = apiKeys.find((key) => key.id === document.querySelector('#api-key-select').value);
-  if (!selected?.value) return;
-  await navigator.clipboard.writeText(selected.value);
-  showToast('API Key 已复制');
 });
 document.querySelector('#copy-callback').addEventListener('click', async () => {
   await navigator.clipboard.writeText(document.querySelector('#oidc-redirect-uri').value);
