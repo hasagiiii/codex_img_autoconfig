@@ -130,7 +130,9 @@ button { cursor: pointer; }
 .base-url-control { min-width: 0; position: relative; }
 .combo-input-wrap { min-width: 0; position: relative; }
 .combo-input-wrap input { width: 100%; box-sizing: border-box; padding-right: 30px; }
-.combo-toggle { position: absolute; top: 1px; right: 1px; width: 27px; height: 28px; border: 0; border-left: 1px solid var(--line); border-radius: 0 3px 3px 0; color: var(--muted); background: var(--surface-2); cursor: pointer; }
+.combo-toggle { position: absolute; top: 1px; right: 1px; width: 27px; height: 28px; padding: 0; border: 0; color: var(--muted); background: transparent; cursor: pointer; font-size: 0; }
+.combo-toggle::before { content: ''; display: inline-block; width: 7px; height: 7px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: translateY(-2px) rotate(45deg); }
+.combo-toggle:hover { color: var(--text); background: transparent; }
 .combo-menu { position: absolute; z-index: 20; top: 32px; left: 0; right: 0; padding: 3px; border: 1px solid var(--line-strong); border-radius: 4px; background: #182126; box-shadow: 0 8px 20px #0008; }
 .combo-menu button { display: block; width: 100%; padding: 7px 8px; border: 0; color: var(--text); background: transparent; text-align: left; font: 10px Consolas, monospace; cursor: pointer; }
 .combo-menu button:hover { background: #29423d; }
