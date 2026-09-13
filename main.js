@@ -159,19 +159,68 @@ async function downloadUpdate() {
 }
 
 function findConfigPath() {
+  const customDirectory = readConfiguredConfigDirectory();
+  if (customDirectory) return path.join(customDirectory, 'config.toml');
   const existing = CONFIG_CANDIDATES.find((filePath) => {
     try { return fsSync.statSync(filePath).isFile(); } catch { return false; }
   });
-  return existing || CONFIG_CANDIDATES[1];
+  return existing || path.join(defaultConfigGroupDirectory(), 'config.toml');
 }
 
-function configGroupDirectory() {
+function configDirectorySettingsPath() {
+  return path.join(app.getPath('userData'), 'codex-config-settings.json');
+}
+
+function readConfiguredConfigDirectory() {
+  try {
+    const stored = JSON.parse(fsSync.readFileSync(configDirectorySettingsPath(), 'utf8'));
+    if (typeof stored.directory !== 'string' || !stored.directory.trim()) return '';
+    return path.resolve(stored.directory);
+  } catch {
+    return '';
+  }
+}
+
+function defaultConfigGroupDirectory() {
   const configured = process.env.CODEX_CONFIG_PATH;
   if (configured) return path.dirname(configured);
   const existing = CONFIG_CANDIDATES.find((filePath) => {
     try { return fsSync.statSync(filePath).isFile(); } catch { return false; }
   });
   return existing ? path.dirname(existing) : path.join(os.homedir(), '.codex');
+}
+
+function configGroupDirectory() {
+  return readConfiguredConfigDirectory() || defaultConfigGroupDirectory();
+}
+
+function configDirectoryInfo() {
+  const customDirectory = readConfiguredConfigDirectory();
+  return {
+    directory: customDirectory || defaultConfigGroupDirectory(),
+    customized: Boolean(customDirectory),
+    defaultDirectory: defaultConfigGroupDirectory()
+  };
+}
+
+async function chooseConfigDirectory() {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '选择 Codex 配置目录',
+    defaultPath: configGroupDirectory(),
+    properties: ['openDirectory', 'createDirectory']
+  });
+  if (result.canceled || !result.filePaths[0]) return { canceled: true, ...configDirectoryInfo() };
+  const directory = path.resolve(result.filePaths[0]);
+  await fs.mkdir(path.dirname(configDirectorySettingsPath()), { recursive: true });
+  await fs.writeFile(configDirectorySettingsPath(), JSON.stringify({ directory }, null, 2), 'utf8');
+  return { ok: true, ...configDirectoryInfo() };
+}
+
+async function resetConfigDirectory() {
+  try { await fs.unlink(configDirectorySettingsPath()); } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+  return { ok: true, ...configDirectoryInfo() };
 }
 
 async function listConfigFiles() {
@@ -668,6 +717,9 @@ function createWindow() {
 }
 
 ipcMain.handle('config:list-files', listConfigFiles);
+ipcMain.handle('config:directory', () => configDirectoryInfo());
+ipcMain.handle('config:choose-directory', chooseConfigDirectory);
+ipcMain.handle('config:reset-directory', resetConfigDirectory);
 ipcMain.handle('config:read', (_event, targetPath) => readConfig(targetPath));
 ipcMain.handle('config:save', (_event, payload) => saveConfig(payload?.path, String(payload?.content ?? '')));
 ipcMain.handle('config:list-backups', (_event, targetPath) => listBackups(targetPath));

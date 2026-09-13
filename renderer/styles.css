@@ -97,6 +97,13 @@ button { cursor: pointer; }
 .file-inspector-details::-webkit-scrollbar, .file-inspector .api-key-status::-webkit-scrollbar { display: none; }
 .file-inspector .api-key-status { scrollbar-width: none; }
 .section-kicker { color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; }
+.config-directory-control { margin-top: 16px; padding-top: 13px; border-top: 1px solid var(--line); }
+.config-directory-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.config-directory-label { color: #cbd5d8; font-size: 11px; font-weight: 650; }
+.config-directory-mode { color: var(--muted); font-size: 10px; }
+.config-directory-path { margin-top: 6px; overflow: hidden; color: #8f9da2; font: 10px/1.45 Consolas, monospace; text-overflow: ellipsis; white-space: nowrap; }
+.config-directory-actions { display: flex; gap: 12px; margin-top: 7px; }
+.config-directory-actions .text-button { font-size: 10px; }
 .file-status { display: flex; align-items: center; gap: 9px; margin-top: 18px; font-size: 14px; font-weight: 650; }
 .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warning); }
 .status-dot.ready { background: var(--accent); }

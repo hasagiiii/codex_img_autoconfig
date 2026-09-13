@@ -3,6 +3,9 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('desktopApi', {
   config: {
     listFiles: () => ipcRenderer.invoke('config:list-files'),
+    directory: () => ipcRenderer.invoke('config:directory'),
+    chooseDirectory: () => ipcRenderer.invoke('config:choose-directory'),
+    resetDirectory: () => ipcRenderer.invoke('config:reset-directory'),
     read: (path) => ipcRenderer.invoke('config:read', path),
     save: (path, content) => ipcRenderer.invoke('config:save', { path, content }),
     listBackups: (path) => ipcRenderer.invoke('config:list-backups', path),

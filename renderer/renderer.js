@@ -306,6 +306,24 @@ function renderConfigFiles() {
   });
 }
 
+function renderConfigDirectory(info) {
+  const pathElement = document.querySelector('#config-directory-path');
+  const modeElement = document.querySelector('#config-directory-mode');
+  const resetButton = document.querySelector('#reset-config-directory');
+  pathElement.textContent = info.directory || '未找到配置目录';
+  pathElement.title = info.directory || '';
+  modeElement.textContent = info.customized ? '自定义' : '默认';
+  resetButton.classList.toggle('hidden', !info.customized);
+}
+
+async function loadConfigDirectory() {
+  try {
+    renderConfigDirectory(await api.config.directory());
+  } catch (error) {
+    document.querySelector('#config-directory-path').textContent = `读取失败：${error.message}`;
+  }
+}
+
 async function loadConfigFiles() {
   try {
     const previousEnv = configFiles.find((file) => file.name === '.env');
@@ -694,6 +712,16 @@ document.addEventListener('keydown', (event) => {
 document.querySelector('#refresh-backups').addEventListener('click', loadBackups);
 document.querySelector('#close-diff').addEventListener('click', closeDiffView);
 document.querySelector('#open-folder').addEventListener('click', () => api.config.openFolder(currentConfig?.path));
+document.querySelector('#choose-config-directory').addEventListener('click', (event) => {
+  event.currentTarget.disabled = true;
+  switchConfigDirectory(() => api.config.chooseDirectory(), '配置目录已切换')
+    .finally(() => { event.currentTarget.disabled = false; });
+});
+document.querySelector('#reset-config-directory').addEventListener('click', (event) => {
+  event.currentTarget.disabled = true;
+  switchConfigDirectory(() => api.config.resetDirectory(), '已恢复默认配置目录')
+    .finally(() => { event.currentTarget.disabled = false; });
+});
 document.querySelector('#choose-file').addEventListener('click', async () => {
   try {
     const chosen = await api.config.chooseFile();
@@ -825,6 +853,7 @@ function closeAccountMenu() {
 }
 
 async function initializeConfigFiles() {
+  await loadConfigDirectory();
   await loadConfigFiles();
   const auth = configFiles.find((file) => file.name === 'auth.json');
   if (auth) {
@@ -833,6 +862,25 @@ async function initializeConfigFiles() {
   }
   const preferred = configFiles.find((file) => file.name === 'config.toml') || configFiles[0];
   if (preferred) await loadConfig(() => api.config.read(preferred.path));
+}
+
+async function switchConfigDirectory(action, successMessage) {
+  if (currentConfig && editor.value !== savedContent &&
+      !window.confirm('当前文件有未保存修改，切换配置目录将丢弃这些修改。继续吗？')) return;
+  try {
+    const result = await action();
+    if (result.canceled) return;
+    closeDiffView();
+    drafts.clear();
+    currentConfig = null;
+    authConfig = null;
+    activeBackup = null;
+    renderConfigDirectory(result);
+    await initializeConfigFiles();
+    showToast(successMessage);
+  } catch (error) {
+    showToast(`配置目录操作失败：${error.message}`, true);
+  }
 }
 
 api.oidc.onStatusChanged((status) => {

@@ -69,6 +69,17 @@
               <aside class="file-inspector">
                 <div class="file-inspector-details">
                 <div class="section-kicker">当前文件</div>
+                <div class="config-directory-control">
+                  <div class="config-directory-heading">
+                    <span class="config-directory-label">配置目录</span>
+                    <span class="config-directory-mode" id="config-directory-mode">默认</span>
+                  </div>
+                  <div class="config-directory-path" id="config-directory-path">正在定位...</div>
+                  <div class="config-directory-actions">
+                    <button class="text-button" id="choose-config-directory" type="button">选择目录</button>
+                    <button class="text-button hidden" id="reset-config-directory" type="button">恢复默认</button>
+                  </div>
+                </div>
                 <div class="file-status">
                   <span class="status-dot" id="status-dot"></span>
                   <span id="config-state">读取中</span>
