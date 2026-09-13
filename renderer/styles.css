@@ -117,6 +117,8 @@ button { cursor: pointer; }
 .inspector-note { margin-top: 0; color: #758288; font-size: 11px; line-height: 1.65; }
 .api-key-picker { margin-top: 22px; padding-top: 17px; border-top: 1px solid var(--line); }
 .api-key-form-row { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 8px; align-items: center; margin-bottom: 8px; }
+.api-key-value-row { align-items: start; }
+.api-key-value-row .api-key-field-name { line-height: 30px; }
 .api-key-field-name { color: var(--muted); font-size: 11px; line-height: 28px; }
 .api-key-value { min-width: 0; }
 .api-key-mode { height: 28px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 2px; border: 1px solid var(--line); border-radius: 5px; background: #11171b; }
@@ -125,6 +127,7 @@ button { cursor: pointer; }
 .api-key-mode button.active { color: #dff8f0; background: #263a35; }
 #api-key-manual-panel input { height: 30px; padding: 0 8px; font: 11px Consolas, monospace; }
 .provider-key-control { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) 28px; gap: 4px; position: relative; }
+.provider-key-control:not(.has-refresh) { grid-template-columns: minmax(0, 1fr); }
 .provider-key-control > .combo-input-wrap { min-width: 0; }
 .provider-key-control > .combo-input-wrap input { height: 30px; min-width: 0; padding: 0 30px 0 7px; font: 10px Consolas, monospace; }
 .provider-key-control select { height: 30px; padding: 0 7px; border-radius: 4px; font-size: 10px; }
@@ -222,8 +225,7 @@ input:focus, select:focus { border-color: #4d9f89; box-shadow: 0 0 0 3px rgba(11
 .update-progress { grid-column: 1 / -1; height: 3px; overflow: hidden; background: var(--line); }
 .update-progress > div { width: 0; height: 100%; background: var(--accent); transition: width .15s ease; }
 
-.api-key-login { display: inline-flex; align-items: center; justify-content: center; gap: 6px; width: 68px; height: 28px; min-height: 28px; padding: 0; border-color: var(--line-strong); font-size: 12px; font-weight: 500; background: var(--surface-2); }
-.api-key-login .codicon { font-size: 14px; }
+.api-key-login-hint { display: block; margin-top: 0; color: var(--muted); font-size: 10px; line-height: 30px; }
 .login-dialog { width: min(800px, calc(100vw - 64px)); max-height: calc(100vh - 80px); padding: 0; overflow: auto; border: 1px solid var(--line-strong); border-radius: 8px; color: var(--text); background: var(--surface); box-shadow: 0 24px 80px rgba(0,0,0,.5); }
 .login-dialog::backdrop { background: rgba(0,0,0,.6); }
 .login-dialog-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid var(--line); }

@@ -595,8 +595,10 @@ async function saveOidcSettings() {
 
 function renderAuthStatus(status) {
   authenticated = Boolean(status.authenticated);
-  document.querySelector('#api-key-login').classList.toggle('hidden', authenticated);
+  document.querySelector('#api-key-login-hint').classList.toggle('hidden', authenticated);
   document.querySelector('#api-key-controls').classList.remove('hidden');
+  document.querySelector('#api-key-controls').classList.toggle('has-refresh', authenticated);
+  document.querySelector('#api-key-toggle').classList.toggle('hidden', !authenticated);
   document.querySelector('#refresh-api-keys').classList.toggle('hidden', !authenticated);
   if (!authenticated) {
     apiKeyRequest++;
@@ -799,7 +801,6 @@ document.querySelector('#restart-codex').addEventListener('click', async (event)
   }
 });
 document.querySelector('#login-button').addEventListener('click', login);
-document.querySelector('#api-key-login').addEventListener('click', showLoginDialog);
 document.querySelector('#nav-login').addEventListener('click', showLoginDialog);
 document.querySelector('#close-login').addEventListener('click', () => loginDialog.close());
 loginDialog.addEventListener('click', (event) => {
