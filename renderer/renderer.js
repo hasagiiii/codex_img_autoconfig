@@ -567,7 +567,7 @@ async function saveOidcSettings() {
 function renderAuthStatus(status) {
   authenticated = Boolean(status.authenticated);
   document.querySelector('#api-key-login').classList.toggle('hidden', authenticated);
-  document.querySelector('#api-key-controls').classList.toggle('hidden', !authenticated);
+  document.querySelector('#api-key-controls').classList.remove('hidden');
   document.querySelector('#refresh-api-keys').classList.toggle('hidden', !authenticated);
   if (!authenticated) {
     apiKeyRequest++;
