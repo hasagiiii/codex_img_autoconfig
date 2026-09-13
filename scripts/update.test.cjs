@@ -34,3 +34,10 @@ test('version tags publish a GitHub Release with repository token', () => {
   assert.match(workflow, /npm run release:github/);
   assert.match(workflow, /GH_TOKEN: \$\{\{ secrets\.GITHUB_TOKEN \}\}/);
 });
+
+test('GitHub publishing builds installer and portable artifacts', () => {
+  const buildScript = fs.readFileSync(path.join(root, 'scripts', 'build-win.ps1'), 'utf8');
+  assert.match(buildScript, /@\\('--win', 'nsis', 'portable'/);
+  assert.ok(packageJson.build.nsis);
+  assert.ok(packageJson.build.portable);
+});

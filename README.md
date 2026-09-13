@@ -42,7 +42,7 @@ npm version patch
 git push origin main --follow-tags
 ```
 
-`v*` 标签会触发 `.github/workflows/release.yml`，运行测试并发布 NSIS 安装包及 `latest.yml`。自动更新面向安装版；portable 版本仍需手动替换。公开客户端不能在程序中保存 GitHub Token，因此供普通用户更新的 GitHub 仓库和 Release 需要公开可下载。
+`v*` 标签会触发 `.github/workflows/release.yml`，运行测试并同时发布 NSIS 安装包、portable 便携版及 `latest.yml`。自动更新面向安装版；portable 版本仍需手动替换。公开客户端不能在程序中保存 GitHub Token，因此供普通用户更新的 GitHub 仓库和 Release 需要公开可下载。
 
 应用会把 Codex 配置目录中的以下文件作为一组管理，并在左侧切换：
 

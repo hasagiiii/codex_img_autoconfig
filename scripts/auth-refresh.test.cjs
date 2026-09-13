@@ -22,6 +22,7 @@ function setup(grant, tokenOverrides = {}) {
     unprotect: (value) => value,
     protect: (value) => value,
     readOidcSettings: async () => ({ issuer: 'https://example.test', clientId: 'app', clientAuthMethod: 'none' }),
+    allowLocalOidcCertificate: () => {},
     fsSync: { writeFileSync: (_path, value) => { stored = JSON.parse(value); } },
     logout: async () => { stored = null; vm.runInContext('authRevision += 1', context); },
     oidcErrorMessage: (error) => error.message,

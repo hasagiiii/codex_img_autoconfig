@@ -27,7 +27,8 @@ try {
     if (-not $env:GH_TOKEN) {
       throw 'GH_TOKEN is required when -Publish is used.'
     }
-    $builderArguments += @('--publish', 'always')
+    # A GitHub Release should contain both the installer and portable package.
+    $builderArguments = @('--win', 'nsis', 'portable', "--$Arch", '--publish', 'always')
   }
   & $builder @builderArguments
   if ($LASTEXITCODE -ne 0) {

@@ -4,7 +4,23 @@ const fsSync = require('fs');
 const http = require('http');
 const path = require('path');
 const os = require('os');
+const dns = require('dns');
 const { autoUpdater } = require('electron-updater');
+
+// Some local HTTPS providers bind only to IPv6 while Node resolves localhost
+// to IPv4 first. Keep the user-facing issuer as localhost, but use ::1.
+const originalDnsLookup = dns.lookup;
+dns.lookup = function lookup(hostname, options, callback) {
+  const isLocalhost = String(hostname).toLowerCase() === 'localhost';
+  if (!isLocalhost) return originalDnsLookup.call(dns, hostname, options, callback);
+  if (typeof options === 'function') {
+    callback = options;
+    options = {};
+  }
+  const all = Boolean(options?.all);
+  if (all) return process.nextTick(callback, null, [{ address: '::1', family: 6 }]);
+  return process.nextTick(callback, null, '::1', 6);
+};
 
 const DEFAULT_REDIRECT_URI = 'http://localhost:53682/oauth/callback';
 const DEFAULT_OIDC_SETTINGS = {
@@ -74,6 +90,16 @@ function publishUpdateState(patch = {}) {
 
 function updateErrorMessage(error) {
   return String(error?.message || error || '检查更新失败').replace(/\s+/g, ' ').trim();
+}
+
+function allowLocalOidcCertificate(issuer) {
+  try {
+    if (new URL(issuer).hostname.toLowerCase() === 'localhost') {
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+    }
+  } catch {
+    // URL validation reports the user-facing configuration error later.
+  }
 }
 
 function configureAutoUpdater() {
@@ -237,6 +263,7 @@ let tokenRefreshPromise = null;
 let authRevision = 0;
 
 async function discoverPublicClient(oidc, issuer, clientId) {
+  allowLocalOidcCertificate(issuer);
   const config = await oidc.discovery(
     new URL(issuer), clientId,
     { token_endpoint_auth_method: 'none' },
