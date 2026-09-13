@@ -4,6 +4,7 @@ const fsSync = require('fs');
 const http = require('http');
 const path = require('path');
 const os = require('os');
+const { execFile } = require('child_process');
 const dns = require('dns');
 const { autoUpdater } = require('electron-updater');
 
@@ -707,6 +708,13 @@ ipcMain.handle('auth:open-last-url', async () => {
   await shell.openExternal(lastAuthorizationUrl);
   return { ok: true, url: lastAuthorizationUrl };
 });
+ipcMain.handle('codex:restart', async () => new Promise((resolve) => {
+  execFile('taskkill.exe', ['/IM', 'codex.exe', '/T', '/F'], { windowsHide: true }, (_error) => {
+    execFile('codex.exe', [], { windowsHide: true }, (startError) => {
+      resolve({ restarted: !startError });
+    });
+  });
+}));
 ipcMain.handle('update:status', () => updateState);
 ipcMain.handle('update:check', checkForUpdates);
 ipcMain.handle('update:download', downloadUpdate);

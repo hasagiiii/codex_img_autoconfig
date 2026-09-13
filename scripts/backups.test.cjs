@@ -126,6 +126,15 @@ test('API Key application creates provider section and updates dotenv without lo
   assert.equal(apply.updateEnv('', 'new-key'), 'OPENAI_API_KEY = new-key\n');
 });
 
+test('Base URL application preserves provider section and supports custom values', () => {
+  const apply = configApply();
+  const input = '[model_providers.custom]\nname = "Keep"\nbase_url = "https://old.example"\n';
+  const output = apply.updateBaseUrl(input, 'https://custom.example');
+  assert.match(output, /name = "Keep"/);
+  assert.match(output, /base_url = "https:\/\/custom\.example"/);
+  assert.equal((output.match(/base_url\s*=/g) || []).length, 1);
+});
+
 test('opening backup switches inline editor and preserves current draft', async () => {
   const elements = new Map();
   function element(id) {

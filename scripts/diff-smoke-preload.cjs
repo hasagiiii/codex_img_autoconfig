@@ -44,6 +44,9 @@ contextBridge.exposeInMainWorld('desktopApi', {
     install: async () => ({ ok: true }),
     onChanged: () => {}
   },
+  codex: {
+    restart: async () => ({ restarted: false })
+  },
   window: {}
 });
 contextBridge.exposeInMainWorld('testFixture', { removeEnv: () => files.delete(envPath) });

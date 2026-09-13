@@ -122,6 +122,18 @@
                     <span></span>
                     <button class="button button-primary apply-api-key" id="apply-api-key" type="button" disabled><span class="codicon codicon-run" aria-hidden="true"></span>应用</button>
                   </div>
+                  <div class="api-key-form-row base-url-row">
+                    <label class="api-key-field-name" for="base-url-select">Base URL</label>
+                    <div class="base-url-control">
+                      <select id="base-url-select" aria-label="Base URL">
+                        <option value="https://opentk.ai">https://opentk.ai</option>
+                        <option value="https://api.opentk.ai">https://api.opentk.ai</option>
+                        <option value="https://hk.opentk.ai">https://hk.opentk.ai</option>
+                        <option value="custom">自定义</option>
+                      </select>
+                      <input id="base-url-custom" class="hidden" type="url" placeholder="https://example.com" aria-label="自定义 Base URL">
+                    </div>
+                  </div>
                 </div>
                 </div>
               </aside>

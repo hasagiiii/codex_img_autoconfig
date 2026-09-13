@@ -20,6 +20,7 @@ let backupRequest = 0;
 let providerKeysLoaded = false;
 let apiKeyMode = 'provider';
 let apiKeyModeTouched = false;
+let baseUrl = 'https://opentk.ai';
 let updaterState = null;
 const drafts = new Map();
 let authConfig = null;
@@ -39,6 +40,21 @@ function authDraft() {
   if (!authConfig) return null;
   if (currentConfig?.path === authConfig.path) return { content: editor.value, saved: savedContent };
   return drafts.get(authConfig.path) || { content: authConfig.content || '', saved: authConfig.content || '' };
+}
+
+function extractBaseUrl(content) {
+  const match = String(content || '').match(/^\s*base_url\s*=\s*["']([^"']+)["']/mi);
+  return match?.[1] || 'https://opentk.ai';
+}
+
+function renderBaseUrl(value) {
+  baseUrl = value || 'https://opentk.ai';
+  const select = document.querySelector('#base-url-select');
+  const custom = document.querySelector('#base-url-custom');
+  const preset = [...select.options].find((option) => option.value === baseUrl);
+  select.value = preset ? baseUrl : 'custom';
+  custom.value = preset ? '' : baseUrl;
+  custom.classList.toggle('hidden', select.value !== 'custom');
 }
 
 function renderApiKeyMode() {
@@ -139,11 +155,15 @@ async function applyApiKey() {
     const [authSource, tomlSource, envSource] = await Promise.all([
       fileDraft(authFile), fileDraft(tomlFile), fileDraft(envFile)
     ]);
+    const selectedBaseUrl = document.querySelector('#base-url-select').value === 'custom'
+      ? document.querySelector('#base-url-custom').value.trim()
+      : document.querySelector('#base-url-select').value;
+    baseUrl = selectedBaseUrl;
     const authData = parseAuth(authSource.content);
     authData.OPENAI_API_KEY = key;
     const contents = new Map([
       [authFile.path, `${JSON.stringify(authData, null, 2)}\n`],
-      [tomlFile.path, window.ConfigApply.updateTomlProvider(tomlSource.content || '')],
+      [tomlFile.path, window.ConfigApply.updateBaseUrl(window.ConfigApply.updateTomlProvider(tomlSource.content || ''), selectedBaseUrl)],
       [envFile.path, window.ConfigApply.updateEnv(envSource.content || '', key)]
     ]);
     const results = new Map();
@@ -160,7 +180,10 @@ async function applyApiKey() {
     await loadConfigFiles();
     syncManualKey();
     const changed = [...results.values()].some((result) => !result.unchanged);
-    showToast(changed ? 'API Key 已应用到 Codex 配置' : '配置内容未变化，未创建备份');
+    const restart = await api.codex.restart();
+    showToast(changed
+      ? (restart.restarted ? 'API Key 和 Base URL 已应用，Codex 已重启' : '配置已应用，但未检测到 Codex 进程')
+      : (restart.restarted ? '配置内容未变化，未创建备份；Codex 已重启' : '配置内容未变化，未创建备份'));
   } catch (error) {
     showToast(`应用失败：${error.message}`, true);
   } finally {
@@ -266,6 +289,7 @@ function renderConfig(config) {
   document.querySelector('#status-dot').classList.toggle('ready', Boolean(config.exists));
   document.querySelector('#editor-subtitle').textContent = config.exists ? '保存时会自动生成备份' : '保存后会创建此文件';
   codeView?.setContents(editor.value, config.path);
+  if (config.name === 'config.toml' || /config\.toml$/i.test(config.path || '')) renderBaseUrl(extractBaseUrl(config.content));
   updateDirtyState();
   updateCursor();
   renderConfigFiles();
@@ -690,6 +714,11 @@ document.querySelector('#manual-api-key').addEventListener('input', (event) => {
   setManualKey(event.target.value);
 });
 document.querySelector('#apply-api-key').addEventListener('click', applyApiKey);
+document.querySelector('#base-url-select').addEventListener('change', (event) => {
+  const custom = document.querySelector('#base-url-custom');
+  custom.classList.toggle('hidden', event.target.value !== 'custom');
+  if (event.target.value !== 'custom') baseUrl = event.target.value;
+});
 document.querySelector('#restore-backup').addEventListener('click', () => {
   if (!activeBackup) return;
   diffView?.restore(activeBackup.content);

@@ -37,6 +37,9 @@ contextBridge.exposeInMainWorld('desktopApi', {
       return () => ipcRenderer.removeListener('update:changed', listener);
     }
   },
+  codex: {
+    restart: () => ipcRenderer.invoke('codex:restart')
+  },
   window: {
     minimize: () => ipcRenderer.send('window:minimize'),
     toggleMaximize: () => ipcRenderer.send('window:toggle-maximize'),
