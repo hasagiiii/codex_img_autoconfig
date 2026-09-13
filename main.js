@@ -26,10 +26,10 @@ dns.lookup = function lookup(hostname, options, callback) {
 
 const DEFAULT_REDIRECT_URI = 'http://localhost:53682/oauth/callback';
 const DEFAULT_OIDC_SETTINGS = {
-  issuer: '',
-  clientId: '',
+  issuer: 'https://opentk.ai',
+  clientId: 'rp_f226saroedw7mluvsqg5co4mlm',
   clientAuthMethod: 'none',
-  scopes: 'openid profile email',
+  scopes: 'openid profile email offline_access sub2api:apikey',
   redirectUri: DEFAULT_REDIRECT_URI
 };
 

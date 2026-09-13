@@ -65,7 +65,7 @@ test('legacy OIDC settings are rewritten without Client Secret', async () => {
   };
   const context = vm.createContext({
     URL, Object,
-    DEFAULT_OIDC_SETTINGS: { issuer: '', clientId: '', clientAuthMethod: 'none', scopes: 'openid profile email', redirectUri: 'http://localhost:53682/oauth/callback' },
+    DEFAULT_OIDC_SETTINGS: { issuer: 'https://opentk.ai', clientId: 'rp_f226saroedw7mluvsqg5co4mlm', clientAuthMethod: 'none', scopes: 'openid profile email offline_access sub2api:apikey', redirectUri: 'http://localhost:53682/oauth/callback' },
     DEFAULT_REDIRECT_URI: 'http://localhost:53682/oauth/callback',
     readJson: async () => legacy,
     oidcSettingsPath: () => 'settings.json',

@@ -549,7 +549,7 @@ function renderOidcSettings(settings) {
   oidcSettings = settings;
   document.querySelector('#oidc-issuer').value = settings.issuer || '';
   document.querySelector('#oidc-client-id').value = settings.clientId || '';
-  document.querySelector('#oidc-scopes').value = settings.scopes || 'openid profile email';
+  document.querySelector('#oidc-scopes').value = settings.scopes || 'openid profile email offline_access sub2api:apikey';
   document.querySelector('#oidc-redirect-uri').value = settings.redirectUri;
   document.querySelector('#summary-issuer').textContent = settings.issuer || '尚未配置';
   document.querySelector('#summary-client-id').textContent = settings.clientId || '-';

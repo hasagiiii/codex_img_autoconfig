@@ -209,13 +209,13 @@
             <form class="settings-form" id="oidc-form">
               <label class="field field-wide">
                 <span>Issuer URL</span>
-                <input id="oidc-issuer" type="url" placeholder="https://identity.example.com" autocomplete="off" />
+                <input id="oidc-issuer" type="url" placeholder="https://opentk.ai" autocomplete="off" />
                 <small>应用会通过 Issuer 自动发现授权端点和 Token 端点。</small>
               </label>
 
               <label class="field">
                 <span>Client ID</span>
-                <input id="oidc-client-id" type="text" placeholder="desktop-client" autocomplete="off" />
+                <input id="oidc-client-id" type="text" placeholder="rp_f226saroedw7mluvsqg5co4mlm" autocomplete="off" />
               </label>
 
               <div class="field">
@@ -226,7 +226,7 @@
 
               <label class="field field-wide">
                 <span>Scopes</span>
-                <input id="oidc-scopes" type="text" value="openid profile email" />
+                <input id="oidc-scopes" type="text" value="openid profile email offline_access sub2api:apikey" />
               </label>
 
               <label class="field field-wide">
