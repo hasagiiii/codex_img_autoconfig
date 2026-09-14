@@ -66,7 +66,7 @@ Codex 配置页支持选择自定义配置目录。选择后会持久化使用�
 默认本机回调地址：
 
 ```text
-http://localhost:53682/oauth/callback
+http://localhost:53777/oauth/callback
 ```
 
 请将该地址加入 OIDC Provider 的 Allowed Redirect URIs。应用会在登录时监听本机固定端口，并通过系统默认浏览器完成授权。应用作为 Public Client，使用 Authorization Code Flow、PKCE S256、state 和 nonce，不保存或发送 Client Secret。登录令牌使用 Electron `safeStorage` 加密后保存在应用数据目录。

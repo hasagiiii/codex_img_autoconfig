@@ -24,7 +24,11 @@ dns.lookup = function lookup(hostname, options, callback) {
   return process.nextTick(callback, null, '::1', 6);
 };
 
-const DEFAULT_REDIRECT_URI = 'http://localhost:53682/oauth/callback';
+const DEFAULT_REDIRECT_URI = 'http://localhost:53777/oauth/callback';
+const LEGACY_REDIRECT_URIS = new Set([
+  'http://localhost:53682/oauth/callback',
+  'http://127.0.0.1:53682/oauth/callback'
+]);
 const DEFAULT_OIDC_SETTINGS = {
   issuer: 'https://opentk.ai',
   clientId: 'rp_f226saroedw7mluvsqg5co4mlm',
@@ -269,7 +273,7 @@ async function readJson(filePath, fallback) {
 
 async function readOidcSettings() {
   const stored = await readJson(oidcSettingsPath(), {});
-  const storedRedirectUri = stored.redirectUri === 'http://127.0.0.1:53682/oauth/callback'
+  const storedRedirectUri = LEGACY_REDIRECT_URIS.has(stored.redirectUri)
     ? DEFAULT_REDIRECT_URI
     : stored.redirectUri;
   const settings = {
@@ -281,7 +285,8 @@ async function readOidcSettings() {
   };
   const hasLegacySecret = Object.prototype.hasOwnProperty.call(stored, 'clientSecretProtected') ||
     Object.prototype.hasOwnProperty.call(stored, 'clientSecret');
-  if (hasLegacySecret || (stored.clientAuthMethod && stored.clientAuthMethod !== 'none')) {
+  const migratedRedirectUri = typeof stored.redirectUri === 'string' && storedRedirectUri !== stored.redirectUri;
+  if (hasLegacySecret || (stored.clientAuthMethod && stored.clientAuthMethod !== 'none') || migratedRedirectUri) {
     await fs.mkdir(path.dirname(oidcSettingsPath()), { recursive: true });
     await fs.writeFile(oidcSettingsPath(), JSON.stringify(settings, null, 2), 'utf8');
   }

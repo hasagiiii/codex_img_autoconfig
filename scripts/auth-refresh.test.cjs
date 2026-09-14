@@ -65,8 +65,12 @@ test('legacy OIDC settings are rewritten without Client Secret', async () => {
   };
   const context = vm.createContext({
     URL, Object,
-    DEFAULT_OIDC_SETTINGS: { issuer: 'https://opentk.ai', clientId: 'rp_f226saroedw7mluvsqg5co4mlm', clientAuthMethod: 'none', scopes: 'openid profile email offline_access sub2api:apikey', redirectUri: 'http://localhost:53682/oauth/callback' },
-    DEFAULT_REDIRECT_URI: 'http://localhost:53682/oauth/callback',
+    DEFAULT_OIDC_SETTINGS: { issuer: 'https://opentk.ai', clientId: 'rp_f226saroedw7mluvsqg5co4mlm', clientAuthMethod: 'none', scopes: 'openid profile email offline_access sub2api:apikey', redirectUri: 'http://localhost:53777/oauth/callback' },
+    DEFAULT_REDIRECT_URI: 'http://localhost:53777/oauth/callback',
+    LEGACY_REDIRECT_URIS: new Set([
+      'http://localhost:53682/oauth/callback',
+      'http://127.0.0.1:53682/oauth/callback'
+    ]),
     readJson: async () => legacy,
     oidcSettingsPath: () => 'settings.json',
     path: { dirname: () => '.' },
@@ -79,9 +83,11 @@ test('legacy OIDC settings are rewritten without Client Secret', async () => {
   vm.runInContext(settingsSource, context);
   const settings = await context.readOidcSettings();
   assert.equal(settings.clientAuthMethod, 'none');
+  assert.equal(settings.redirectUri, 'http://localhost:53777/oauth/callback');
   assert.equal('clientSecret' in settings, false);
   assert.equal('clientSecretProtected' in settings, false);
   assert.equal(writes.length, 1);
+  assert.equal(writes[0].redirectUri, 'http://localhost:53777/oauth/callback');
   assert.equal('clientSecretProtected' in writes[0], false);
 
   writes.length = 0;

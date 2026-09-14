@@ -30,7 +30,7 @@ contextBridge.exposeInMainWorld('desktopApi', {
     deleteBackup: async () => ({ canceled: true })
   },
   oidc: {
-    readSettings: async () => ({ issuer: 'https://identity.example.test', clientId: 'opentk-test', redirectUri: 'http://localhost:53682/oauth/callback' }),
+    readSettings: async () => ({ issuer: 'https://identity.example.test', clientId: 'opentk-test', redirectUri: 'http://localhost:53777/oauth/callback' }),
     status: async () => authStatus(),
     login: async () => { loggedIn = true; return authStatus(); },
     logout: async () => { loggedIn = false; return authStatus(); },
