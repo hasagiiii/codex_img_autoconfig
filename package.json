@@ -1,6 +1,6 @@
 {
   "name": "codex-config-studio",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Desktop editor for the Codex configuration file",
   "author": "OpenTk",
   "repository": {
@@ -15,7 +15,9 @@
     "test": "node --test scripts/backups.test.cjs scripts/auth-refresh.test.cjs scripts/update.test.cjs",
     "build:win": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-win.ps1",
     "build:win:installer": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-win.ps1 -Target nsis",
-    "release:github": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-win.ps1 -Target nsis -Publish"
+    "build:mac": "node ./scripts/build-mac.cjs",
+    "release:github": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-win.ps1 -Target nsis -Publish",
+    "release:mac": "node ./scripts/build-mac.cjs --publish"
   },
   "devDependencies": {
     "electron": "^31.0.2",
@@ -38,9 +40,11 @@
       "main.js",
       "preload.js",
       "renderer/**/*",
+      "assets/**/*",
       "package.json"
     ],
     "win": {
+      "icon": "assets/app-icon.ico",
       "signAndEditExecutable": false,
       "target": [
         {
@@ -60,6 +64,27 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
+    },
+    "mac": {
+      "icon": "assets/app-icon.icns",
+      "category": "public.app-category.developer-tools",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "artifactName": "OpenTk-Codex-Config-Tool-${version}-${arch}.${ext}"
     },
     "publish": {
       "provider": "github",

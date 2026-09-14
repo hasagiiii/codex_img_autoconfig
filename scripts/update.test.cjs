@@ -41,3 +41,29 @@ test('GitHub publishing builds installer and portable artifacts', () => {
   assert.ok(packageJson.build.nsis);
   assert.ok(packageJson.build.portable);
 });
+
+test('macOS builds publish dmg and zip artifacts for both architectures', () => {
+  const buildScript = fs.readFileSync(path.join(root, 'scripts', 'build-mac.cjs'), 'utf8');
+  assert.equal(packageJson.scripts['build:mac'], 'node ./scripts/build-mac.cjs');
+  assert.equal(packageJson.scripts['release:mac'], 'node ./scripts/build-mac.cjs --publish');
+  assert.deepEqual(packageJson.build.mac.target, [
+    { target: 'dmg', arch: ['x64', 'arm64'] },
+    { target: 'zip', arch: ['x64', 'arm64'] }
+  ]);
+  assert.match(buildScript, /process\.platform !== 'darwin'/);
+  assert.match(buildScript, /--publish/);
+  assert.match(workflow, /runs-on: macos-latest/);
+  assert.match(workflow, /npm run release:mac/);
+});
+
+test('application icon and user data directory use the supplied app identity', () => {
+  assert.equal(packageJson.build.win.icon, 'assets/app-icon.ico');
+  assert.equal(packageJson.build.mac.icon, 'assets/app-icon.icns');
+  assert.match(packageJson.build.files.join('\n'), /assets\/\*\*\//);
+  assert.match(main, /app\.setName\('codex_img_autoconfig'\)/);
+  assert.match(main, /app\.setPath\('userData', path\.join\(app\.getPath\('appData'\), 'codex_img_autoconfig'\)\)/);
+  assert.match(main, /assets', 'app-icon\.png'/);
+  assert.ok(fs.existsSync(path.join(root, 'assets', 'app-icon.png')));
+  assert.ok(fs.existsSync(path.join(root, 'assets', 'app-icon.ico')));
+  assert.ok(fs.existsSync(path.join(root, 'assets', 'app-icon.icns')));
+});

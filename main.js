@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, shell, Menu, safeStorage } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, shell, Menu, Tray, nativeImage, safeStorage } = require('electron');
 const fs = require('fs/promises');
 const fsSync = require('fs');
 const http = require('http');
@@ -8,6 +8,10 @@ const { execFile } = require('child_process');
 const { promisify } = require('util');
 const dns = require('dns');
 const { autoUpdater } = require('electron-updater');
+
+const legacyUserDataPath = app.getPath('userData');
+app.setName('codex_img_autoconfig');
+app.setPath('userData', path.join(app.getPath('appData'), 'codex_img_autoconfig'));
 
 // Some local HTTPS providers bind only to IPv6 while Node resolves localhost
 // to IPv4 first. Keep the user-facing issuer as localhost, but use ::1.
@@ -51,6 +55,9 @@ const CHATGPT_PROCESS_NAME = 'ChatGPT.exe';
 let mainWindow;
 let activeLoginServer;
 let lastAuthorizationUrl = '';
+let tray;
+let isQuitting = false;
+let closePromptInFlight = false;
 let updaterConfigured = false;
 let updateState = {
   supported: false,
@@ -86,8 +93,81 @@ function oidcSettingsPath() {
   return path.join(app.getPath('userData'), 'oidc-settings.json');
 }
 
+function windowSettingsPath() {
+  return path.join(app.getPath('userData'), 'window-settings.json');
+}
+
+async function readWindowSettings() {
+  try {
+    const stored = await readJson(windowSettingsPath(), {});
+    return {
+      minimizeToTray: stored.minimizeToTray !== false,
+      closeChoiceSet: stored.closeChoiceSet === true
+    };
+  } catch {
+    return { minimizeToTray: true, closeChoiceSet: false };
+  }
+}
+
+async function saveWindowSettings(patch = {}) {
+  const current = await readWindowSettings();
+  const settings = {
+    minimizeToTray: patch.minimizeToTray === undefined ? current.minimizeToTray : Boolean(patch.minimizeToTray),
+    closeChoiceSet: patch.closeChoiceSet === undefined ? current.closeChoiceSet : Boolean(patch.closeChoiceSet)
+  };
+  await fs.mkdir(path.dirname(windowSettingsPath()), { recursive: true });
+  await fs.writeFile(windowSettingsPath(), JSON.stringify(settings, null, 2), 'utf8');
+  return settings;
+}
+
+function showMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function ensureTray() {
+  if (tray) return tray;
+  const icon = nativeImage.createFromPath(path.join(__dirname, 'assets', 'app-icon.png'))
+    .resize({ width: 16, height: 16 });
+  tray = new Tray(icon);
+  tray.setToolTip('OpenTk Codex配置工具');
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: '打开 OpenTk', click: showMainWindow },
+    { type: 'separator' },
+    { label: '退出应用', click: () => { isQuitting = true; app.quit(); } }
+  ]));
+  tray.on('click', showMainWindow);
+  return tray;
+}
+
+function applyWindowClose(minimizeToTray) {
+  if (minimizeToTray) {
+    ensureTray();
+    mainWindow?.hide();
+  } else {
+    isQuitting = true;
+    app.quit();
+  }
+}
+
 function authSessionPath() {
   return path.join(app.getPath('userData'), 'oidc-session.json');
+}
+
+async function migrateLegacyUserData() {
+  const targetDirectory = app.getPath('userData');
+  if (path.resolve(legacyUserDataPath) === path.resolve(targetDirectory) || !fsSync.existsSync(legacyUserDataPath)) return;
+  await fs.mkdir(targetDirectory, { recursive: true });
+  for (const name of ['oidc-settings.json', 'oidc-session.json', 'codex-config-settings.json', 'window-settings.json']) {
+    const source = path.join(legacyUserDataPath, name);
+    const target = path.join(targetDirectory, name);
+    try { await fs.access(target); } catch (error) {
+      if (error.code !== 'ENOENT') continue;
+      try { await fs.copyFile(source, target); } catch (copyError) { if (copyError.code !== 'ENOENT') throw copyError; }
+    }
+  }
 }
 
 function publishUpdateState(patch = {}) {
@@ -562,6 +642,7 @@ async function createLoopbackListener(redirectUri) {
     resolveCallback = resolve;
     rejectCallback = reject;
   });
+  let closed = false;
   const server = http.createServer((request, response) => {
     const currentUrl = new URL(request.url, redirect.origin);
     if (currentUrl.pathname !== redirect.pathname) {
@@ -578,13 +659,22 @@ async function createLoopbackListener(redirectUri) {
     server.listen(Number(redirect.port), redirect.hostname, resolve);
   });
   const timer = setTimeout(() => rejectCallback(new Error('登录等待超时，请重新尝试。')), 5 * 60 * 1000);
-  const close = () => {
+  const close = (reason = new Error('登录已取消。')) => {
+    if (closed) return;
+    closed = true;
     clearTimeout(timer);
+    rejectCallback(reason);
     if (server.listening) server.close();
     if (activeLoginServer === server) activeLoginServer = null;
   };
   activeLoginServer = server;
   return { callback, close };
+}
+
+function cancelOidcLogin() {
+  if (!activeLoginServer) return { canceled: false };
+  activeLoginServer.close(new Error('登录已取消。'));
+  return { canceled: true };
 }
 
 function oidcErrorMessage(error, phase) {
@@ -707,6 +797,7 @@ function createWindow() {
     minHeight: 650,
     backgroundColor: '#101417',
     title: 'OpenTk',
+    icon: path.join(__dirname, 'assets', 'app-icon.png'),
     frame: false,
     titleBarStyle: 'hidden',
     autoHideMenuBar: true,
@@ -718,6 +809,27 @@ function createWindow() {
     }
   });
   mainWindow.setMenuBarVisibility(false);
+  mainWindow.on('close', (event) => {
+    if (isQuitting) return;
+    if (closePromptInFlight) {
+      event.preventDefault();
+      return;
+    }
+    event.preventDefault();
+    closePromptInFlight = true;
+    (async () => {
+      const settings = await readWindowSettings();
+      if (!settings.closeChoiceSet) {
+        mainWindow.webContents.send('window:close-requested', settings);
+        return;
+      }
+      closePromptInFlight = false;
+      applyWindowClose(settings.minimizeToTray);
+    })().catch((error) => {
+      closePromptInFlight = false;
+      dialog.showErrorBox('关闭失败', error.message || String(error));
+    });
+  });
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 }
 
@@ -756,6 +868,7 @@ ipcMain.handle('oidc:save-settings', (_event, settings) => saveOidcSettings(sett
 ipcMain.handle('oidc:api-keys', fetchApiKeys);
 ipcMain.handle('auth:status', getAuthStatus);
 ipcMain.handle('auth:login', startOidcLogin);
+ipcMain.handle('auth:cancel-login', cancelOidcLogin);
 ipcMain.handle('auth:logout', logout);
 ipcMain.handle('auth:open-provider', async () => {
   const settings = await readOidcSettings();
@@ -831,6 +944,26 @@ ipcMain.handle('update:install', () => {
   setImmediate(() => autoUpdater.quitAndInstall(false, true));
   return { ok: true };
 });
+ipcMain.handle('window:read-settings', () => readWindowSettings());
+ipcMain.handle('window:save-settings', (_event, settings) => saveWindowSettings({
+  minimizeToTray: Boolean(settings?.minimizeToTray)
+}));
+ipcMain.handle('window:resolve-close', async (_event, choice) => {
+  if (!closePromptInFlight || !['tray', 'quit'].includes(choice)) return { ok: false };
+  try {
+    const settings = await saveWindowSettings({
+      minimizeToTray: choice === 'tray',
+      closeChoiceSet: true
+    });
+    closePromptInFlight = false;
+    applyWindowClose(settings.minimizeToTray);
+    return { ok: true };
+  } catch (error) {
+    closePromptInFlight = false;
+    throw error;
+  }
+});
+ipcMain.on('window:cancel-close', () => { closePromptInFlight = false; });
 ipcMain.on('window:minimize', () => mainWindow?.minimize());
 ipcMain.on('window:toggle-maximize', () => {
   if (!mainWindow) return;
@@ -839,8 +972,9 @@ ipcMain.on('window:toggle-maximize', () => {
 });
 ipcMain.on('window:close', () => mainWindow?.close());
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   if (!hasSingleInstanceLock) return;
+  await migrateLegacyUserData();
   Menu.setApplicationMenu(null);
   createWindow();
   configureAutoUpdater();
@@ -851,7 +985,10 @@ app.whenReady().then(() => {
 });
 
 app.on('before-quit', () => {
+  isQuitting = true;
   if (activeLoginServer?.listening) activeLoginServer.close();
+  tray?.destroy();
+  tray = null;
 });
 
 app.on('window-all-closed', () => {

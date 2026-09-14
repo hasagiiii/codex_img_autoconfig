@@ -85,6 +85,7 @@ button { cursor: pointer; }
 .view.active { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 
 .segmented { display: flex; gap: 2px; padding: 16px 30px 0; border-bottom: 1px solid var(--line); }
+.settings-tabs { flex: 0 0 auto; }
 .segment { height: 38px; padding: 0 14px; border: 0; border-bottom: 2px solid transparent; color: var(--muted); background: transparent; }
 .segment:hover { color: #d7dfe1; }
 .segment.active { border-bottom-color: var(--accent); color: var(--text); }
@@ -203,6 +204,16 @@ button { cursor: pointer; }
 .settings-heading h2 { margin: 0; font-size: 18px; }
 .settings-heading p { margin: 7px 0 0; color: var(--muted); font-size: 12px; }
 .settings-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 19px 22px; max-width: 900px; padding: 26px 34px 40px; }
+.app-settings-form { grid-template-columns: minmax(0, 1fr); max-width: none; }
+.setting-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+.setting-toggle-row > span { display: grid; gap: 6px; }
+.setting-toggle-row strong { color: #cbd5d8; font-size: 13px; font-weight: 650; }
+.setting-toggle-row small { color: var(--muted); font-size: 11px; line-height: 1.5; }
+.setting-toggle-row input { width: 42px; height: 24px; flex: 0 0 auto; appearance: none; padding: 0; border: 1px solid #53646a; border-radius: 12px; background: #29353a; cursor: pointer; transition: .15s ease; }
+.setting-toggle-row input::before { content: ''; display: block; width: 18px; height: 18px; margin: 2px; border-radius: 50%; background: #aeb9bd; transition: .15s ease; }
+.setting-toggle-row input:checked { border-color: var(--accent-strong); background: #315d50; }
+.setting-toggle-row input:checked::before { transform: translateX(18px); background: var(--accent); }
+.setting-toggle-row input:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
 .field { display: grid; gap: 8px; }
 .field-wide { grid-column: 1 / -1; }
 .field > span { color: #cbd5d8; font-size: 12px; font-weight: 650; }
@@ -228,6 +239,12 @@ input:focus, select:focus { border-color: #4d9f89; box-shadow: 0 0 0 3px rgba(11
 .api-key-login-hint { display: block; margin-top: 0; color: var(--muted); font-size: 10px; line-height: 30px; }
 .login-dialog { width: min(800px, calc(100vw - 64px)); max-height: calc(100vh - 80px); padding: 0; overflow: auto; border: 1px solid var(--line-strong); border-radius: 8px; color: var(--text); background: var(--surface); box-shadow: 0 24px 80px rgba(0,0,0,.5); }
 .login-dialog::backdrop { background: rgba(0,0,0,.6); }
+.close-choice-dialog { width: min(430px, calc(100vw - 48px)); padding: 0; border: 1px solid var(--line-strong); border-radius: 8px; color: var(--text); background: var(--surface); box-shadow: 0 24px 80px rgba(0,0,0,.5); }
+.close-choice-dialog::backdrop { background: rgba(0,0,0,.6); }
+.close-choice-header { padding: 18px 22px 14px; border-bottom: 1px solid var(--line); }
+.close-choice-header strong { font-size: 15px; }
+.close-choice-dialog > p { margin: 0; padding: 20px 22px 4px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.close-choice-actions { display: flex; justify-content: flex-end; gap: 9px; padding: 18px 22px 20px; }
 .login-dialog-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid var(--line); }
 .login-dialog-header strong { font-size: 14px; }
 .login-layout { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 24px; align-items: start; padding: 24px; }

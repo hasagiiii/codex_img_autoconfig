@@ -25,6 +25,9 @@ let updaterState = null;
 const drafts = new Map();
 let authConfig = null;
 const loginDialog = document.querySelector('#login-dialog');
+const closeChoiceDialog = document.querySelector('#close-choice-dialog');
+let loginInFlight = false;
+let loginAttempt = 0;
 
 function isAuthFile(path) {
   return /(^|[\\/])auth\.json$/i.test(path || '');
@@ -556,6 +559,57 @@ function showView(viewId) {
   document.querySelector('#file-actions').classList.toggle('hidden', viewId !== 'codex-view');
 }
 
+function showSettingsPanel(panelId) {
+  document.querySelectorAll('#oidc-view [data-settings-panel]').forEach((item) => {
+    const active = item.dataset.settingsPanel === panelId;
+    item.classList.toggle('active', active);
+    item.setAttribute('aria-selected', String(active));
+  });
+  document.querySelectorAll('#oidc-view .config-panel').forEach((panel) => {
+    panel.classList.toggle('active', panel.id === panelId);
+  });
+}
+
+async function loadWindowSettings() {
+  try {
+    const settings = await api.window.readSettings();
+    document.querySelector('#close-to-tray-toggle').checked = settings.minimizeToTray !== false;
+  } catch (error) {
+    showToast(`应用设置读取失败：${error.message}`, true);
+  }
+}
+
+async function saveWindowSettings() {
+  try {
+    await api.window.saveSettings({
+      minimizeToTray: document.querySelector('#close-to-tray-toggle').checked
+    });
+    showToast('应用设置已保存');
+  } catch (error) {
+    showToast(`应用设置保存失败：${error.message}`, true);
+  }
+}
+
+function showCloseChoice(settings) {
+  if (settings?.minimizeToTray !== undefined) {
+    document.querySelector('#close-to-tray-toggle').checked = settings.minimizeToTray !== false;
+  }
+  if (!closeChoiceDialog.open) closeChoiceDialog.showModal();
+}
+
+async function resolveCloseChoice(choice) {
+  const buttons = closeChoiceDialog.querySelectorAll('button');
+  buttons.forEach((button) => { button.disabled = true; });
+  try {
+    const result = await api.window.resolveClose(choice);
+    if (result?.ok) closeChoiceDialog.close();
+  } catch (error) {
+    showToast(`关闭设置保存失败：${error.message}`, true);
+  } finally {
+    buttons.forEach((button) => { button.disabled = false; });
+  }
+}
+
 function showLoginDialog() {
   if (authenticated || loginDialog.open) return;
   closeAccountMenu();
@@ -650,27 +704,39 @@ async function refreshAuthStatus() {
 
 async function login() {
   const button = document.querySelector('#login-button');
-  if (button.disabled) return;
+  if (loginInFlight) {
+    loginAttempt += 1;
+    try { await api.oidc.cancelLogin(); } catch { /* The previous attempt may already have finished. */ }
+    loginInFlight = false;
+    return login();
+  }
+  loginInFlight = true;
+  const attempt = ++loginAttempt;
   const message = document.querySelector('#login-message');
-  button.disabled = true;
-  button.textContent = '等待浏览器授权...';
+  button.disabled = false;
+  button.textContent = '重新发起登录';
   message.className = 'login-message';
   message.textContent = '本地回调监听已启动，登录窗口将在系统浏览器中打开。';
   try {
     const status = await api.oidc.login();
+    if (attempt !== loginAttempt) return;
     renderAuthStatus(status);
     loadApiKeys();
     message.textContent = '登录成功。';
     showToast('OIDC 登录成功');
   } catch (error) {
+    if (attempt !== loginAttempt || error.message === '登录已取消。') return;
     message.className = 'login-message error';
     message.textContent = error.message.includes('WWW-Authenticate challenge')
       ? `${error.message} 可以先手动打开 Provider 检查登录入口，随后再重试。`
       : error.message;
     document.querySelector('#manual-login-button').classList.remove('hidden');
   } finally {
-    button.disabled = false;
-    button.textContent = '使用 OIDC 登录';
+    if (attempt === loginAttempt) {
+      loginInFlight = false;
+      button.disabled = false;
+      button.textContent = '重新发起登录';
+    }
   }
 }
 
@@ -685,6 +751,10 @@ async function logout() {
 }
 
 document.querySelectorAll('[data-view]').forEach((item) => item.addEventListener('click', () => showView(item.dataset.view)));
+document.querySelectorAll('[data-settings-panel]').forEach((item) => item.addEventListener('click', () => {
+  showSettingsPanel(item.dataset.settingsPanel);
+}));
+document.querySelector('#close-to-tray-toggle').addEventListener('change', saveWindowSettings);
 document.querySelector('#save-config').addEventListener('click', saveConfig);
 document.querySelector('#reload-config').addEventListener('click', async () => {
   const target = currentConfig?.path;
@@ -832,6 +902,18 @@ document.querySelector('#manual-login-button').addEventListener('click', async (
 document.querySelector('#window-minimize').addEventListener('click', () => api.window.minimize());
 document.querySelector('#window-maximize').addEventListener('click', () => api.window.toggleMaximize());
 document.querySelector('#window-close').addEventListener('click', () => api.window.close());
+document.querySelector('#cancel-close-choice').addEventListener('click', () => {
+  closeChoiceDialog.close();
+  api.window.cancelClose();
+});
+document.querySelector('#choose-close-quit').addEventListener('click', () => resolveCloseChoice('quit'));
+document.querySelector('#choose-close-tray').addEventListener('click', () => resolveCloseChoice('tray'));
+closeChoiceDialog.addEventListener('cancel', (event) => {
+  event.preventDefault();
+  closeChoiceDialog.close();
+  api.window.cancelClose();
+});
+api.window.onCloseRequested(showCloseChoice);
 document.querySelector('#go-oidc-settings').addEventListener('click', () => {
   loginDialog.close();
   showView('oidc-view');
@@ -896,4 +978,4 @@ setInterval(async () => {
   try { renderAuthStatus(await api.oidc.status()); } catch { /* Retry on the next tick. */ }
 }, 60000);
 renderApiKeyMode();
-Promise.all([initializeCodeEditor(), initializeConfigFiles(), loadOidcSettings(), refreshAuthStatus(), loadUpdateStatus()]);
+Promise.all([initializeCodeEditor(), initializeConfigFiles(), loadOidcSettings(), loadWindowSettings(), refreshAuthStatus(), loadUpdateStatus()]);

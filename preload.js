@@ -25,6 +25,7 @@ contextBridge.exposeInMainWorld('desktopApi', {
     apiKeys: () => ipcRenderer.invoke('oidc:api-keys'),
     status: () => ipcRenderer.invoke('auth:status'),
     login: () => ipcRenderer.invoke('auth:login'),
+    cancelLogin: () => ipcRenderer.invoke('auth:cancel-login'),
     logout: () => ipcRenderer.invoke('auth:logout'),
     openProvider: () => ipcRenderer.invoke('auth:open-provider'),
     openLastUrl: () => ipcRenderer.invoke('auth:open-last-url')
@@ -44,6 +45,15 @@ contextBridge.exposeInMainWorld('desktopApi', {
     restart: () => ipcRenderer.invoke('codex:restart')
   },
   window: {
+    readSettings: () => ipcRenderer.invoke('window:read-settings'),
+    saveSettings: (settings) => ipcRenderer.invoke('window:save-settings', settings),
+    onCloseRequested: (callback) => {
+      const listener = (_event, settings) => callback(settings);
+      ipcRenderer.on('window:close-requested', listener);
+      return () => ipcRenderer.removeListener('window:close-requested', listener);
+    },
+    resolveClose: (choice) => ipcRenderer.invoke('window:resolve-close', choice),
+    cancelClose: () => ipcRenderer.send('window:cancel-close'),
     minimize: () => ipcRenderer.send('window:minimize'),
     toggleMaximize: () => ipcRenderer.send('window:toggle-maximize'),
     close: () => ipcRenderer.send('window:close')

@@ -9,6 +9,10 @@ npm install
 npm start
 ```
 
+首次点击右上角关闭按钮时，可以选择退出应用或最小化到系统托盘；选择会保存到应用配置，之后关闭按钮会直接执行该操作。
+
+应用自身配置和登录会话保存在 `%APPDATA%\\codex_img_autoconfig`。
+
 ## 打包 Windows 可执行文件
 
 默认生成免安装的单文件 `.exe`：
@@ -29,6 +33,14 @@ npm run build:win:installer
 .\scripts\build-win.ps1 -Target portable -Arch x64
 ```
 
+在 macOS 上生成 Intel 和 Apple Silicon 的 DMG、ZIP 安装包：
+
+```bash
+npm run build:mac
+```
+
+macOS 构建必须在 macOS 机器或 macOS GitHub Actions runner 上执行。未配置 Apple Developer 证书时会生成未签名应用，首次打开可能需要在系统安全设置中手动允许。
+
 打包产物位于 `dist` 目录。首次打包前需要执行一次 `npm install`。
 
 ## GitHub 在线更新
@@ -42,7 +54,7 @@ npm version patch
 git push origin main --follow-tags
 ```
 
-`v*` 标签会触发 `.github/workflows/release.yml`，运行测试并同时发布 NSIS 安装包、portable 便携版及 `latest.yml`。自动更新面向安装版；portable 版本仍需手动替换。公开客户端不能在程序中保存 GitHub Token，因此供普通用户更新的 GitHub 仓库和 Release 需要公开可下载。
+`v*` 标签会触发 `.github/workflows/release.yml`，运行测试并同时发布 Windows NSIS 安装包、portable 便携版及 macOS DMG/ZIP 和对应更新元数据。自动更新面向安装版；portable 版本仍需手动替换。公开客户端不能在程序中保存 GitHub Token，因此供普通用户更新的 GitHub 仓库和 Release 需要公开可下载。
 
 应用会把 Codex 配置目录中的以下文件作为一组管理，并在左侧切换：
 

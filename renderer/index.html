@@ -208,7 +208,24 @@
         </section>
 
         <section class="view" id="oidc-view">
-          <section class="config-panel active" id="oidc-panel">
+          <nav class="segmented settings-tabs" aria-label="设置分类">
+            <button class="segment active" type="button" data-settings-panel="app-settings-panel">常规设置</button>
+            <button class="segment" type="button" data-settings-panel="oidc-panel">OIDC 配置</button>
+          </nav>
+
+          <section class="config-panel active" id="app-settings-panel">
+            <div class="settings-form app-settings-form">
+              <label class="setting-toggle-row" for="close-to-tray-toggle">
+                <span>
+                  <strong>点击关闭按钮缩放到托盘</strong>
+                  <small>开启后，点击右上角 X 会隐藏窗口并保留托盘图标。</small>
+                </span>
+                <input id="close-to-tray-toggle" type="checkbox" checked />
+              </label>
+            </div>
+          </section>
+
+          <section class="config-panel" id="oidc-panel">
             <div class="settings-heading">
               <div>
                 <h2>OIDC Provider</h2>
@@ -269,6 +286,18 @@
         </section>
 
       </main>
+
+        <dialog class="close-choice-dialog" id="close-choice-dialog" aria-labelledby="close-choice-title">
+          <header class="close-choice-header">
+            <strong id="close-choice-title">关闭 OpenTk</strong>
+          </header>
+          <p>请选择点击右上角关闭按钮时的操作。这个选择会保存到应用配置。</p>
+          <div class="close-choice-actions">
+            <button class="button button-secondary" id="cancel-close-choice" type="button">取消</button>
+            <button class="button button-secondary" id="choose-close-quit" type="button">关闭应用</button>
+            <button class="button button-primary" id="choose-close-tray" type="button">缩小到托盘</button>
+          </div>
+        </dialog>
 
         <dialog class="login-dialog" id="login-dialog" aria-labelledby="login-dialog-title">
           <header class="login-dialog-header">
