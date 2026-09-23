@@ -20,12 +20,12 @@
     "release:mac": "node ./scripts/build-mac.cjs --publish"
   },
   "devDependencies": {
-    "electron": "^31.0.2",
-    "electron-builder": "^24.13.3"
+    "electron": "^44.4.3",
+    "electron-builder": "^26.15.3"
   },
   "dependencies": {
     "electron-updater": "^6.1.8",
-    "monaco-editor": "^0.56.0",
+    "monaco-editor": "^0.53.0",
     "openid-client": "^6.8.1"
   },
   "build": {

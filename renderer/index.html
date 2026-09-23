@@ -11,7 +11,6 @@
   <body>
     <div class="app-shell">
       <header class="windowbar">
-        <div class="window-title">OpenTk</div>
         <div class="window-controls">
           <button class="window-control" id="window-minimize" title="最小化">−</button>
           <button class="window-control" id="window-maximize" title="最大化">□</button>
@@ -87,10 +86,7 @@
                 <div class="config-file-list editor-file-list" id="config-file-list" aria-label="Codex 配置文件">
                   <div class="file-list-loading">正在读取文件...</div>
                 </div>
-                <div class="file-path" id="config-path">正在定位...</div>
-
                 <dl class="file-meta">
-                  <div><dt>格式</dt><dd id="config-format">-</dd></div>
                   <div><dt>大小</dt><dd id="config-size">-</dd></div>
                   <div><dt>编辑状态</dt><dd id="dirty-state">未修改</dd></div>
                 </dl>
@@ -109,6 +105,18 @@
                         <button type="button" role="option" data-value="https://api.opentk.ai">https://api.opentk.ai</button>
                         <button type="button" role="option" data-value="https://hk.opentk.ai">https://hk.opentk.ai</button>
                       </div>
+                    </div>
+                  </div>
+                  <div class="api-key-form-row model-row">
+                    <label class="api-key-field-name" for="model-input">模型</label>
+                    <div class="model-control">
+                      <div class="combo-input-wrap">
+                        <input id="model-input" type="text" placeholder="输入或选择模型" aria-label="模型" autocomplete="off" spellcheck="false">
+                        <button class="combo-toggle" id="model-toggle" type="button" aria-label="选择模型" aria-expanded="false">⌄</button>
+                      </div>
+                      <button class="icon-button small model-save-button" id="save-custom-model" type="button" title="保存为自定义模型" aria-label="保存为自定义模型"><span class="model-save-glyph" aria-hidden="true">&#xeb4b;</span></button>
+                      <div class="combo-menu hidden" id="model-menu" role="listbox"></div>
+                      <small class="model-status" id="model-status" role="status"></small>
                     </div>
                   </div>
                   <div class="api-key-form-row source-row">
@@ -163,6 +171,7 @@
                   <div>
                     <strong>配置内容</strong>
                     <span id="editor-subtitle">加载后即可编辑</span>
+                    <span class="editor-config-path" id="config-path">正在定位...</span>
                   </div>
                   <div class="editor-toolbar-actions">
                     <button class="icon-button hidden" id="close-diff" title="返回编辑器">←</button>
@@ -179,6 +188,7 @@
                 </div>
                 <div class="editor-frame" id="editor-frame">
                   <div id="config-editor" aria-label="Codex 配置内容"></div>
+                  <textarea class="plain-config-editor hidden" id="plain-config-editor" aria-label="Codex 配置内容" spellcheck="false"></textarea>
                 </div>
                 <div class="diff-editor-frame hidden" id="diff-editor-frame">
                   <div class="diff-file-headers">
@@ -297,6 +307,26 @@
             <button class="button button-secondary" id="choose-close-quit" type="button">关闭应用</button>
             <button class="button button-primary" id="choose-close-tray" type="button">缩小到托盘</button>
           </div>
+        </dialog>
+
+        <dialog class="model-cache-dialog" id="model-cache-dialog" aria-labelledby="model-cache-title">
+          <header class="model-cache-header">
+            <strong id="model-cache-title">保存为自定义模型</strong>
+            <button class="icon-button" id="close-model-cache" type="button" title="取消" aria-label="取消">×</button>
+          </header>
+          <div class="model-cache-body">
+            <p class="model-cache-hint">确认要写入 <code>models_cache.json</code> 的模型。可以添加或移除模型。</p>
+            <div class="model-cache-add-row">
+              <input id="custom-model-name" type="text" placeholder="输入模型名称" autocomplete="off" spellcheck="false" aria-label="新增模型名称">
+              <button class="button button-secondary" id="add-custom-model" type="button">添加</button>
+            </div>
+            <div class="model-cache-list" id="model-cache-list" role="list"></div>
+            <small class="model-cache-status" id="model-cache-status" role="status"></small>
+          </div>
+          <footer class="model-cache-actions">
+            <button class="button button-secondary" id="cancel-model-cache" type="button">取消</button>
+            <button class="button button-primary" id="confirm-model-cache" type="button">保存</button>
+          </footer>
         </dialog>
 
         <dialog class="login-dialog" id="login-dialog" aria-labelledby="login-dialog-title">

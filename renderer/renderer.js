@@ -7,6 +7,7 @@ let diffView = null;
 
 let currentConfig = null;
 let savedContent = '';
+let pendingEditorContent = null;
 let oidcSettings = null;
 let apiKeys = [];
 let backups = [];
@@ -21,11 +22,17 @@ let providerKeysLoaded = false;
 let apiKeyMode = 'provider';
 let apiKeyModeTouched = false;
 let baseUrl = 'https://opentk.ai';
+let model = '';
+let providerModels = [];
+let modelRequest = 0;
+let modelLoadTimer = null;
 let updaterState = null;
 const drafts = new Map();
 let authConfig = null;
 const loginDialog = document.querySelector('#login-dialog');
 const closeChoiceDialog = document.querySelector('#close-choice-dialog');
+const modelCacheDialog = document.querySelector('#model-cache-dialog');
+let modelCacheSelection = [];
 let loginInFlight = false;
 let loginAttempt = 0;
 
@@ -50,9 +57,166 @@ function extractBaseUrl(content) {
   return match?.[1] || 'https://opentk.ai';
 }
 
+function extractModel(content) {
+  const tablePattern = /^\s*\[\[?[^\]]+\]\]?\s*(?:#.*)?$/;
+  for (const line of String(content || '').split(/\r?\n/)) {
+    if (tablePattern.test(line)) break;
+    const match = line.match(/^\s*model\s*=\s*["']([^"']*)["']/i);
+    if (match) return match[1];
+  }
+  return '';
+}
+
 function renderBaseUrl(value) {
   baseUrl = value || 'https://opentk.ai';
   document.querySelector('#base-url-input').value = baseUrl;
+}
+
+function renderModel(value) {
+  model = String(value || '');
+  document.querySelector('#model-input').value = model;
+}
+
+function currentApiKey() {
+  // The provider combo is the active source. The hidden manual field can lag
+  // behind while auth.json is being synchronized.
+  return document.querySelector('#api-key-input').value.trim()
+    || document.querySelector('#manual-api-key').value.trim();
+}
+
+function renderModels(models, status = '') {
+  providerModels = models;
+  const menu = document.querySelector('#model-menu');
+  menu.innerHTML = '';
+  if (!models.length) {
+    menu.innerHTML = '<span class="combo-empty">没有可用模型</span>';
+    document.querySelector('#model-status').textContent = status || 'Provider 未返回模型。';
+    return;
+  }
+  models.forEach((entry) => {
+    const option = document.createElement('button');
+    option.type = 'button';
+    option.role = 'option';
+    option.dataset.value = entry.id;
+    option.textContent = entry.label === entry.id ? entry.id : `${entry.label} · ${entry.id}`;
+    option.title = entry.id;
+    option.addEventListener('click', () => {
+      renderModel(entry.id);
+      menu.classList.add('hidden');
+      document.querySelector('#model-toggle').setAttribute('aria-expanded', 'false');
+    });
+    menu.append(option);
+  });
+  document.querySelector('#model-status').textContent = status || `已加载 ${models.length} 个模型。`;
+}
+
+function renderModelCacheSelection() {
+  const list = document.querySelector('#model-cache-list');
+  const status = document.querySelector('#model-cache-status');
+  list.innerHTML = '';
+  if (!modelCacheSelection.length) {
+    list.innerHTML = '<div class="model-cache-empty">暂无模型，请先添加模型。</div>';
+    status.textContent = '至少添加一个模型后才能保存。';
+    document.querySelector('#confirm-model-cache').disabled = true;
+    return;
+  }
+  modelCacheSelection.forEach((entry, index) => {
+    const row = document.createElement('div');
+    row.className = 'model-cache-item';
+    row.setAttribute('role', 'listitem');
+    const name = document.createElement('span');
+    name.className = 'model-cache-item-name';
+    name.textContent = entry.id;
+    name.title = entry.id;
+    const remove = document.createElement('button');
+    remove.className = 'model-cache-remove';
+    remove.type = 'button';
+    remove.title = `移除 ${entry.id}`;
+    remove.setAttribute('aria-label', `移除 ${entry.id}`);
+    remove.textContent = '×';
+    remove.addEventListener('click', () => {
+      modelCacheSelection.splice(index, 1);
+      renderModelCacheSelection();
+    });
+    row.append(name, remove);
+    list.append(row);
+  });
+  status.textContent = `共 ${modelCacheSelection.length} 个模型。`;
+  document.querySelector('#confirm-model-cache').disabled = false;
+}
+
+function openModelCacheDialog() {
+  const current = document.querySelector('#model-input').value.trim();
+  const source = providerModels.length ? providerModels : (current ? [{ id: current, label: current }] : []);
+  const seen = new Set();
+  modelCacheSelection = source.filter((entry) => entry?.id && !seen.has(entry.id) && seen.add(entry.id)).map((entry) => ({ ...entry }));
+  document.querySelector('#custom-model-name').value = '';
+  renderModelCacheSelection();
+  if (!modelCacheDialog.open) modelCacheDialog.showModal();
+}
+
+async function saveCustomModels(models) {
+  const button = document.querySelector('#save-custom-model');
+  if (!models.length || button.disabled) return;
+  button.disabled = true;
+  document.querySelector('#confirm-model-cache').disabled = true;
+  try {
+    const result = await api.config.saveModelCache(models);
+    const tomlFile = configFiles.find((file) => file.name === 'config.toml');
+    if (!tomlFile) throw new Error('没有找到 config.toml');
+    const source = await fileDraft(tomlFile);
+    const content = window.ConfigApply.updateModelCatalogJson(source.content || '');
+    const saved = await api.config.save(tomlFile.path, content);
+    drafts.set(tomlFile.path, { content, saved: content });
+    if (samePath(currentConfig?.path, tomlFile.path)) {
+      currentConfig = { ...currentConfig, ...saved, exists: true };
+      savedContent = editor.value = content;
+      if (codeView) {
+        codeView.setValue(content);
+        hidePlainConfigEditor();
+      } else {
+        showPlainConfigEditor(content);
+      }
+      updateDirtyState();
+    }
+    await loadConfigFiles();
+    modelCacheDialog.close();
+    showToast(`已保存 ${result.count} 个自定义模型，并写入 ${result.path}`);
+  } catch (error) {
+    showToast(`保存自定义模型失败：${error.message}`, true);
+  } finally {
+    button.disabled = false;
+    renderModelCacheSelection();
+  }
+}
+
+function scheduleLoadProviderModels() {
+  clearTimeout(modelLoadTimer);
+  modelLoadTimer = setTimeout(() => loadProviderModels(), 350);
+}
+
+async function loadProviderModels() {
+  const status = document.querySelector('#model-status');
+  const request = ++modelRequest;
+  const selectedBaseUrl = document.querySelector('#base-url-input').value.trim();
+  const apiKey = currentApiKey();
+  if (!selectedBaseUrl) {
+    renderModels([], '请先填写 Base URL。');
+    return;
+  }
+  if (!apiKey) {
+    renderModels([], '请先选择或输入 API Key。');
+    return;
+  }
+  status.textContent = '正在从 Provider 获取模型...';
+  try {
+    const models = await api.provider.models(selectedBaseUrl, apiKey);
+    if (request !== modelRequest) return;
+    renderModels(models);
+  } catch (error) {
+    if (request !== modelRequest) return;
+    renderModels([], error.message);
+  }
 }
 
 function renderApiKeyMode() {
@@ -155,12 +319,19 @@ async function applyApiKey() {
       fileDraft(authFile), fileDraft(tomlFile), fileDraft(envFile)
     ]);
     const selectedBaseUrl = document.querySelector('#base-url-input').value.trim();
+    const selectedModel = document.querySelector('#model-input').value.trim();
+    if (/\r|\n/.test(selectedBaseUrl)) throw new Error('Base URL 不能包含换行符');
+    if (/\r|\n/.test(selectedModel)) throw new Error('模型不能包含换行符');
     baseUrl = selectedBaseUrl;
+    model = selectedModel;
     const authData = parseAuth(authSource.content);
     authData.OPENAI_API_KEY = key;
+    let tomlContent = window.ConfigApply.updateTomlProvider(tomlSource.content || '');
+    tomlContent = window.ConfigApply.updateBaseUrl(tomlContent, selectedBaseUrl);
+    if (selectedModel) tomlContent = window.ConfigApply.updateModel(tomlContent, selectedModel);
     const contents = new Map([
       [authFile.path, `${JSON.stringify(authData, null, 2)}\n`],
-      [tomlFile.path, window.ConfigApply.updateBaseUrl(window.ConfigApply.updateTomlProvider(tomlSource.content || ''), selectedBaseUrl)],
+      [tomlFile.path, tomlContent],
       [envFile.path, window.ConfigApply.updateEnv(envSource.content || '', key)]
     ]);
     const results = new Map();
@@ -179,7 +350,7 @@ async function applyApiKey() {
     const changed = [...results.values()].some((result) => !result.unchanged);
     const restart = await api.codex.restart();
     showToast(changed
-      ? (restart.restarted ? 'API Key 和 Base URL 已应用，Codex 已重启' : '配置已应用，但未检测到 Codex 进程')
+      ? (restart.restarted ? 'API Key、Base URL 和模型已应用，Codex 已重启' : '配置已应用，但未检测到 Codex 进程')
       : (restart.restarted ? '配置内容未变化，未创建备份；Codex 已重启' : '配置内容未变化，未创建备份'));
   } catch (error) {
     showToast(`应用失败：${error.message}`, true);
@@ -249,14 +420,49 @@ function formatBytes(bytes) {
   return `${(bytes / 1024).toFixed(1)} KB`;
 }
 
+function withTimeout(promise, timeoutMs, message) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+function showPlainConfigEditor(content) {
+  const fallback = document.querySelector('#plain-config-editor');
+  const monacoContainer = document.querySelector('#config-editor');
+  fallback.value = String(content ?? '');
+  fallback.classList.remove('hidden');
+  monacoContainer.classList.add('hidden');
+  fallback.oninput = () => {
+    editor.value = fallback.value;
+    updateDirtyState();
+  };
+}
+
+function hidePlainConfigEditor() {
+  document.querySelector('#plain-config-editor').classList.add('hidden');
+  document.querySelector('#config-editor').classList.remove('hidden');
+}
+
 async function initializeCodeEditor() {
   try {
     const monaco = await window.ConfigDiff.load();
     codeView = window.ConfigEditor.create(monaco, document.querySelector('#config-editor'),
       (content) => { editor.value = content; updateDirtyState(); },
       updateCursor, saveConfig);
-    codeView.setContents(editor.value, currentConfig?.path || '');
-  } catch (error) { showToast(`编辑器加载失败：${error.message}`, true); }
+    const pending = pendingEditorContent;
+    pendingEditorContent = null;
+    codeView.setContents(pending?.content ?? editor.value, pending?.path || currentConfig?.path || '');
+    if (codeView.view.getModel()?.getValue() !== editor.value) {
+      showPlainConfigEditor(editor.value);
+      return;
+    }
+    hidePlainConfigEditor();
+  } catch (error) {
+    showPlainConfigEditor(editor.value);
+    showToast(`编辑器加载失败，已切换为文本编辑模式：${error.message}`, true);
+  }
 }
 
 function updateDirtyState() {
@@ -279,14 +485,27 @@ function renderConfig(config) {
   const draft = drafts.get(config.path);
   savedContent = draft?.saved ?? config.content ?? '';
   editor.value = draft?.content ?? savedContent;
+  pendingEditorContent = { content: editor.value, path: config.path };
   document.querySelector('#config-path').textContent = config.path;
-  document.querySelector('#config-format').textContent = config.format || 'TEXT';
   document.querySelector('#config-size').textContent = formatBytes(config.size);
-  document.querySelector('#config-state').textContent = config.exists ? '已读取' : '等待创建';
+  document.querySelector('#config-state').textContent = config.exists
+    ? (typeof config.content === 'string' ? '已读取' : '读取失败')
+    : '等待创建';
   document.querySelector('#status-dot').classList.toggle('ready', Boolean(config.exists));
   document.querySelector('#editor-subtitle').textContent = config.exists ? '保存时会自动生成备份' : '保存后会创建此文件';
-  codeView?.setContents(editor.value, config.path);
-  if (config.name === 'config.toml' || /config\.toml$/i.test(config.path || '')) renderBaseUrl(extractBaseUrl(config.content));
+  if (codeView) {
+    codeView.setContents(editor.value, config.path);
+    pendingEditorContent = null;
+    if (codeView.view.getModel()?.getValue() === editor.value) hidePlainConfigEditor();
+    else showPlainConfigEditor(editor.value);
+  } else {
+    showPlainConfigEditor(editor.value);
+  }
+  if (config.name === 'config.toml' || /config\.toml$/i.test(config.path || '')) {
+    renderBaseUrl(extractBaseUrl(editor.value));
+    renderModel(extractModel(editor.value));
+    scheduleLoadProviderModels();
+  }
   updateDirtyState();
   updateCursor();
   renderConfigFiles();
@@ -321,16 +540,16 @@ function renderConfigDirectory(info) {
 
 async function loadConfigDirectory() {
   try {
-    renderConfigDirectory(await api.config.directory());
+    renderConfigDirectory(await withTimeout(api.config.directory(), 5000, '配置目录定位超时'));
   } catch (error) {
-    document.querySelector('#config-directory-path').textContent = `读取失败：${error.message}`;
+    document.querySelector('#config-directory-path').textContent = `定位失败：${error.message}`;
   }
 }
 
 async function loadConfigFiles() {
   try {
     const previousEnv = configFiles.find((file) => file.name === '.env');
-    const nextFiles = await api.config.listFiles();
+    const nextFiles = await withTimeout(api.config.listFiles(), 5000, '配置文件列表读取超时');
     if (previousEnv && !nextFiles.some((file) => samePath(file.path, previousEnv.path))) drafts.delete(previousEnv.path);
     configFiles = nextFiles;
     if (currentConfig && /(^|[\\/])\.env$/i.test(currentConfig.path) &&
@@ -507,6 +726,7 @@ function renderApiKeys(keys) {
     select.disabled = true;
     document.querySelector('#api-key-status').textContent = 'Provider 没有返回 API Key。';
     syncManualKey();
+    scheduleLoadProviderModels();
     return;
   }
   select.add(new Option('选择 Provider API Key', ''));
@@ -526,6 +746,7 @@ function renderApiKeys(keys) {
   select.disabled = false;
   syncManualKey();
   document.querySelector('#api-key-status').textContent = `已加载 ${apiKeys.length} 个 API Key。`;
+  scheduleLoadProviderModels();
 }
 
 async function loadApiKeys() {
@@ -653,7 +874,10 @@ function renderAuthStatus(status) {
   document.querySelector('#api-key-controls').classList.remove('hidden');
   document.querySelector('#api-key-controls').classList.toggle('has-refresh', authenticated);
   document.querySelector('#api-key-toggle').classList.toggle('hidden', !authenticated);
-  document.querySelector('#refresh-api-keys').classList.toggle('hidden', !authenticated);
+  const refreshKeys = document.querySelector('#refresh-api-keys');
+  refreshKeys.classList.remove('hidden');
+  refreshKeys.disabled = !authenticated;
+  refreshKeys.title = authenticated ? '刷新 Provider API Key' : '登录后刷新 Provider API Key';
   if (!authenticated) {
     apiKeyRequest++;
     providerKeysLoaded = false;
@@ -810,15 +1034,25 @@ document.querySelector('#api-key-mode-manual').addEventListener('click', () => s
 document.querySelector('#api-key-select').addEventListener('change', () => {
   setApiKeyMode('provider');
   const selected = apiKeys.find((key) => key.id === document.querySelector('#api-key-select').value);
-  if (selected?.value) setManualKey(selected.value);
+  if (selected?.value) {
+    setManualKey(selected.value);
+    scheduleLoadProviderModels();
+  }
 });
 document.querySelector('#manual-api-key').addEventListener('input', (event) => {
   setApiKeyMode('manual');
   setManualKey(event.target.value);
+  scheduleLoadProviderModels();
 });
 document.querySelector('#apply-api-key').addEventListener('click', applyApiKey);
 document.querySelector('#base-url-input').addEventListener('input', (event) => {
-  baseUrl = event.target.value.trim();
+  const value = event.target.value.replace(/[\r\n]/g, '');
+  if (value !== event.target.value) event.target.value = value;
+  baseUrl = value.trim();
+  scheduleLoadProviderModels();
+});
+document.querySelector('#base-url-input').addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') event.preventDefault();
 });
 document.querySelector('#base-url-toggle').addEventListener('click', () => {
   const menu = document.querySelector('#base-url-menu');
@@ -832,7 +1066,42 @@ document.querySelectorAll('#base-url-menu [data-value]').forEach((item) => item.
   baseUrl = value;
   document.querySelector('#base-url-menu').classList.add('hidden');
   document.querySelector('#base-url-toggle').setAttribute('aria-expanded', 'false');
+  scheduleLoadProviderModels();
 }));
+document.querySelector('#model-input').addEventListener('input', (event) => {
+  const value = event.target.value.replace(/[\r\n]/g, '');
+  if (value !== event.target.value) event.target.value = value;
+  model = value;
+});
+document.querySelector('#model-input').addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') event.preventDefault();
+});
+document.querySelector('#save-custom-model').addEventListener('click', openModelCacheDialog);
+document.querySelector('#add-custom-model').addEventListener('click', () => {
+  const input = document.querySelector('#custom-model-name');
+  const value = input.value.trim().replace(/[\r\n]/g, '');
+  if (!value) return;
+  if (!modelCacheSelection.some((entry) => entry.id === value)) modelCacheSelection.push({ id: value, label: value });
+  input.value = '';
+  renderModelCacheSelection();
+  input.focus();
+});
+document.querySelector('#custom-model-name').addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    document.querySelector('#add-custom-model').click();
+  }
+});
+document.querySelector('#close-model-cache').addEventListener('click', () => modelCacheDialog.close());
+document.querySelector('#cancel-model-cache').addEventListener('click', () => modelCacheDialog.close());
+document.querySelector('#confirm-model-cache').addEventListener('click', () => saveCustomModels(modelCacheSelection));
+document.querySelector('#model-toggle').addEventListener('click', () => {
+  const menu = document.querySelector('#model-menu');
+  const open = menu.classList.contains('hidden');
+  menu.classList.toggle('hidden', !open);
+  document.querySelector('#model-toggle').setAttribute('aria-expanded', String(open));
+  if (open) loadProviderModels();
+});
 document.querySelector('#api-key-toggle').addEventListener('click', () => {
   const menu = document.querySelector('#api-key-menu');
   const open = menu.classList.contains('hidden');
@@ -842,6 +1111,7 @@ document.querySelector('#api-key-toggle').addEventListener('click', () => {
 document.querySelector('#api-key-input').addEventListener('input', (event) => {
   setApiKeyMode('manual');
   setManualKey(event.target.value);
+  scheduleLoadProviderModels();
 });
 document.querySelector('#restore-backup').addEventListener('click', () => {
   if (!activeBackup) return;
@@ -936,8 +1206,18 @@ function closeAccountMenu() {
 }
 
 async function initializeConfigFiles() {
-  await loadConfigDirectory();
-  await loadConfigFiles();
+  // Directory metadata is independent from the file contents. Do not make a
+  // slow first-run directory IPC prevent the file list and editor from loading.
+  void loadConfigDirectory();
+  // Read the preferred config in parallel as well. A slow directory scan must
+  // not leave the editor stuck on its initial "读取中" state.
+  const initialConfig = withTimeout(api.config.read(), 5000, '配置读取超时').then((config) => {
+    if (!currentConfig) renderConfig(config);
+  }).catch((error) => {
+    showToast(`读取配置失败：${error.message}`, true);
+  });
+  const files = loadConfigFiles();
+  await Promise.all([initialConfig, files]);
   const auth = configFiles.find((file) => file.name === 'auth.json');
   if (auth) {
     try { authConfig = await api.config.read(auth.path); syncManualKey(); }
@@ -966,6 +1246,26 @@ async function switchConfigDirectory(action, successMessage) {
   }
 }
 
+async function initializeEditorAndConfig() {
+  // Do not let a slow Monaco loader block the config directory and file list.
+  // renderConfig stores the pending content and initializeCodeEditor binds it
+  // when the editor becomes available.
+  void initializeCodeEditor();
+  try {
+    await initializeConfigFiles();
+  } catch (error) {
+    document.querySelector('#config-file-list').innerHTML =
+      `<div class="file-list-loading error-text">配置读取失败：${escapeHtml(error.message)}</div>`;
+    document.querySelector('#config-state').textContent = '读取失败';
+    showToast(`配置读取失败：${error.message}`, true);
+    return;
+  }
+  if (currentConfig && codeView) {
+    codeView.setContents(editor.value, currentConfig.path);
+    if (codeView.view.getModel()?.getValue() === editor.value) hidePlainConfigEditor();
+  }
+}
+
 api.oidc.onStatusChanged((status) => {
   renderAuthStatus(status);
   if (!status.authenticated) {
@@ -978,4 +1278,4 @@ setInterval(async () => {
   try { renderAuthStatus(await api.oidc.status()); } catch { /* Retry on the next tick. */ }
 }, 60000);
 renderApiKeyMode();
-Promise.all([initializeCodeEditor(), initializeConfigFiles(), loadOidcSettings(), loadWindowSettings(), refreshAuthStatus(), loadUpdateStatus()]);
+Promise.all([initializeEditorAndConfig(), loadOidcSettings(), loadWindowSettings(), refreshAuthStatus(), loadUpdateStatus()]);

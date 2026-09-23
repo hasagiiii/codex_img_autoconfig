@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('desktopApi', {
     listBackups: (path) => ipcRenderer.invoke('config:list-backups', path),
     readBackup: (path) => ipcRenderer.invoke('config:read-backup', path),
     deleteBackup: (targetPath, backupPath) => ipcRenderer.invoke('config:delete-backup', targetPath, backupPath),
+    saveModelCache: (models) => ipcRenderer.invoke('config:save-model-cache', { models }),
     chooseFile: () => ipcRenderer.invoke('config:choose-file'),
     openFolder: (path) => ipcRenderer.invoke('config:open-folder', path)
   },
@@ -29,6 +30,9 @@ contextBridge.exposeInMainWorld('desktopApi', {
     logout: () => ipcRenderer.invoke('auth:logout'),
     openProvider: () => ipcRenderer.invoke('auth:open-provider'),
     openLastUrl: () => ipcRenderer.invoke('auth:open-last-url')
+  },
+  provider: {
+    models: (baseUrl, apiKey) => ipcRenderer.invoke('provider:models', { baseUrl, apiKey })
   },
   update: {
     status: () => ipcRenderer.invoke('update:status'),

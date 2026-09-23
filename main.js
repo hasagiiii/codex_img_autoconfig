@@ -9,6 +9,10 @@ const { promisify } = require('util');
 const dns = require('dns');
 const { autoUpdater } = require('electron-updater');
 
+// Electron's embedded Node runtime may not include certificates installed in
+// the operating system. Use the system trust store for provider/OIDC HTTPS.
+if (!process.env.NODE_USE_SYSTEM_CA) process.env.NODE_USE_SYSTEM_CA = '1';
+
 const legacyUserDataPath = app.getPath('userData');
 app.setName('codex_img_autoconfig');
 app.setPath('userData', path.join(app.getPath('appData'), 'codex_img_autoconfig'));
@@ -51,6 +55,7 @@ const CONFIG_CANDIDATES = [
 const CONFIG_GROUP_FILES = ['auth.json', 'config.toml', '.env'];
 const execFileAsync = promisify(execFile);
 const CHATGPT_PROCESS_NAME = 'ChatGPT.exe';
+const OPEN_TOKEN_ICON_DATA_URL = 'data:image/png;base64,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';
 
 let mainWindow;
 let activeLoginServer;
@@ -70,7 +75,16 @@ let updateState = {
   total: 0,
   error: ''
 };
-const hasSingleInstanceLock = app.requestSingleInstanceLock();
+
+function logTray(message) {
+  const line = `${new Date().toISOString()} ${message}\n`;
+  for (const target of ['/tmp/opentk-tray.log', path.join(os.tmpdir(), 'opentk-tray.log')]) {
+    try { fsSync.appendFileSync(target, line); } catch { /* Diagnostics must never affect startup. */ }
+  }
+}
+// A packaged build remains single-instance, but `npm start` must be able to
+// run beside an older installed build so source changes are actually visible.
+const hasSingleInstanceLock = app.isPackaged ? app.requestSingleInstanceLock() : true;
 
 if (!hasSingleInstanceLock) {
   app.quit();
@@ -122,24 +136,59 @@ async function saveWindowSettings(patch = {}) {
 
 function showMainWindow() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (process.platform === 'darwin') {
+    app.dock?.show();
+    app.dock?.setIcon(createMacDockIcon());
+  }
   if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();
   mainWindow.focus();
 }
 
+function createMacStatusIcon() {
+  return nativeImage.createFromDataURL(OPEN_TOKEN_ICON_DATA_URL)
+    .resize({ width: 18, height: 18 });
+}
+
+function createMacDockIcon() {
+  const source = nativeImage.createFromDataURL(OPEN_TOKEN_ICON_DATA_URL)
+    .resize({ width: 54, height: 54 });
+  const sourceBitmap = source.toBitmap();
+  const canvasSize = 64;
+  const canvas = Buffer.alloc(canvasSize * canvasSize * 4);
+  const rowBytes = 54 * 4;
+  for (let row = 0; row < 54; row += 1) {
+    const sourceOffset = row * rowBytes;
+    const targetOffset = ((row + 5) * canvasSize + 5) * 4;
+    sourceBitmap.copy(canvas, targetOffset, sourceOffset, sourceOffset + rowBytes);
+  }
+  return nativeImage.createFromBitmap(canvas, { width: canvasSize, height: canvasSize, scaleFactor: 1 });
+}
+
 function ensureTray() {
   if (tray) return tray;
-  const icon = nativeImage.createFromPath(path.join(__dirname, 'assets', 'app-icon.png'))
-    .resize({ width: 16, height: 16 });
-  tray = new Tray(icon);
-  tray.setToolTip('OpenTk Codex配置工具');
-  tray.setContextMenu(Menu.buildFromTemplate([
-    { label: '打开 OpenTk', click: showMainWindow },
-    { type: 'separator' },
-    { label: '退出应用', click: () => { isQuitting = true; app.quit(); } }
-  ]));
-  tray.on('click', showMainWindow);
-  return tray;
+  try {
+    const icon = process.platform === 'darwin'
+      ? createMacStatusIcon()
+      : nativeImage.createFromPath(path.join(__dirname, 'assets', 'app-icon.png'))
+        .resize({ width: 18, height: 18 });
+    logTray(`creating platform=${process.platform} iconEmpty=${icon.isEmpty()} size=${JSON.stringify(icon.getSize())}`);
+    tray = new Tray(icon);
+    tray.setImage(icon);
+    if (process.platform === 'darwin') tray.setTitle('');
+    tray.setToolTip('OpenTk Codex配置工具');
+    tray.setContextMenu(Menu.buildFromTemplate([
+      { label: '打开 OpenTk', click: showMainWindow },
+      { type: 'separator' },
+      { label: '退出应用', click: () => { isQuitting = true; app.quit(); } }
+    ]));
+    tray.on('click', showMainWindow);
+    logTray('created');
+    return tray;
+  } catch (error) {
+    logTray(`failed ${error.stack || error.message}`);
+    throw error;
+  }
 }
 
 function applyWindowClose(minimizeToTray) {
@@ -149,6 +198,23 @@ function applyWindowClose(minimizeToTray) {
   } else {
     isQuitting = true;
     app.quit();
+  }
+}
+
+async function requestWindowClose() {
+  if (!mainWindow || mainWindow.isDestroyed() || closePromptInFlight) return;
+  closePromptInFlight = true;
+  try {
+    const settings = await readWindowSettings();
+    if (!settings.closeChoiceSet) {
+      mainWindow.webContents.send('window:close-requested', settings);
+      return;
+    }
+    closePromptInFlight = false;
+    applyWindowClose(settings.minimizeToTray);
+  } catch (error) {
+    closePromptInFlight = false;
+    dialog.showErrorBox('关闭失败', error.message || String(error));
   }
 }
 
@@ -182,7 +248,8 @@ function updateErrorMessage(error) {
 
 function allowLocalOidcCertificate(issuer) {
   try {
-    if (new URL(issuer).hostname.toLowerCase() === 'localhost') {
+    const hostname = new URL(issuer).hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') {
       process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
     }
   } catch {
@@ -325,6 +392,18 @@ async function listConfigFiles() {
     }
     if (name === '.env' && !exists) continue;
     files.push({ name, path: filePath, exists, size, modifiedAt, format: path.extname(name).slice(1).toUpperCase() || 'ENV' });
+  }
+  const cachePath = modelCachePath();
+  if (!files.some((file) => path.resolve(file.path) === path.resolve(cachePath))) {
+    try {
+      const stat = await fs.stat(cachePath);
+      if (stat.isFile()) files.push({
+        name: 'models_cache.json', path: cachePath, exists: true,
+        size: stat.size, modifiedAt: stat.mtime.toISOString(), format: 'JSON'
+      });
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
   }
   return files;
 }
@@ -502,14 +581,32 @@ async function fetchApiKeys() {
   const settings = await readOidcSettings();
   let accessToken = await readStoredAccessToken();
   const endpoint = `${settings.issuer.replace(/\/$/, '')}/oidc/resource/api-keys`;
+  // Existing sessions may skip OIDC discovery, so enable the local mkcert
+  // compatibility immediately before the API Key request as well.
+  allowLocalOidcCertificate(endpoint);
   const request = () => fetch(endpoint, {
     headers: { Accept: 'application/json', Authorization: `Bearer ${accessToken}` }
   });
-  let response = await request();
+  let response;
+  try {
+    response = await request();
+  } catch (error) {
+    if (error?.cause?.code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' || error?.code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE') {
+      throw new Error('API Key 请求失败：Provider 的 TLS 证书链无法验证。请在系统中安装根证书，或让 Provider 返回完整的证书链后重试。');
+    }
+    throw error;
+  }
   if (response.status === 401) {
     await response.text();
-    accessToken = await readStoredAccessToken(accessToken);
-    response = await request();
+    try {
+      accessToken = await readStoredAccessToken(accessToken);
+      response = await request();
+    } catch (error) {
+      if (error?.cause?.code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' || error?.code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE') {
+        throw new Error('API Key 请求失败：Provider 的 TLS 证书链无法验证。请在系统中安装根证书，或让 Provider 返回完整的证书链后重试。');
+      }
+      throw error;
+    }
   }
   const rawBody = await response.text();
   if (!response.ok) {
@@ -530,6 +627,148 @@ async function fetchApiKeys() {
     throw new Error(`API Key 接口没有返回可用 Key。\n请求地址：${endpoint}\n回包：${JSON.stringify(payload, null, 2)}`);
   }
   return keys;
+}
+
+function providerModelsEndpoint(baseUrl) {
+  const value = String(baseUrl || '').trim();
+  if (!value) throw new Error('请先填写 Base URL。');
+  if (/\r|\n/.test(value)) throw new Error('Base URL 不能包含换行符');
+  let endpoint;
+  try {
+    endpoint = new URL(value).toString().replace(/\/+$/, '');
+  } catch {
+    throw new Error('Base URL 必须是有效的 http:// 或 https:// 地址。');
+  }
+  if (!/^https?:$/i.test(new URL(endpoint).protocol)) {
+    throw new Error('Base URL 必须使用 http:// 或 https://。');
+  }
+  if (/\/v1\/models$/i.test(endpoint)) return endpoint;
+  return `${endpoint}${/\/v1$/i.test(endpoint) ? '' : '/v1'}/models`;
+}
+
+function normalizeModels(payload) {
+  const items = Array.isArray(payload)
+    ? payload
+    : [payload?.data, payload?.models, payload?.items, payload?.data?.items]
+      .find((value) => Array.isArray(value)) || [];
+  if (!Array.isArray(items)) return [];
+  const seen = new Set();
+  return items.map((item) => {
+    if (typeof item === 'string') return { id: item, label: item, raw: null };
+    const id = item?.id || item?.model || item?.name || item?.slug || '';
+    return id ? {
+      id: String(id),
+      label: String(item?.name || item?.label || item?.display_name || id),
+      raw: item
+    } : null;
+  }).filter((item) => item && !seen.has(item.id) && seen.add(item.id));
+}
+
+function modelCachePath() {
+  return path.join(os.homedir(), '.codex', 'models_cache.json');
+}
+
+function modelCacheEntry(input = {}) {
+  const source = input?.raw && typeof input.raw === 'object' ? input.raw : input;
+  const slug = String(source?.slug || source?.id || source?.model || source?.name || '').trim();
+  if (!slug || /[\r\n]/.test(slug)) throw new Error('模型名称不能为空或包含换行符');
+  const displayName = String(source?.display_name || source?.label || source?.name || slug).trim() || slug;
+  return {
+    slug,
+    display_name: displayName,
+    description: String(source?.description || `${displayName} routed through Sub2API.`),
+    default_reasoning_level: source?.default_reasoning_level || 'medium',
+    supported_reasoning_levels: Array.isArray(source?.supported_reasoning_levels)
+      ? source.supported_reasoning_levels
+      : [
+        { effort: 'low', description: 'Fast responses with lighter reasoning' },
+        { effort: 'medium', description: 'Balanced reasoning for most coding tasks' },
+        { effort: 'high', description: 'Greater reasoning depth for coding and agent tasks' },
+        { effort: 'xhigh', description: 'Extra-high reasoning depth for difficult tasks' }
+      ],
+    shell_type: source?.shell_type || 'unified_exec',
+    visibility: source?.visibility || 'list',
+    supported_in_api: source?.supported_in_api !== false,
+    priority: Number.isFinite(source?.priority) ? source.priority : 50,
+    additional_speed_tiers: Array.isArray(source?.additional_speed_tiers) ? source.additional_speed_tiers : [],
+    service_tiers: Array.isArray(source?.service_tiers) ? source.service_tiers : [],
+    default_service_tier: source?.default_service_tier ?? null,
+    availability_nux: source?.availability_nux ?? null,
+    upgrade: source?.upgrade ?? null,
+    model_messages: source?.model_messages || { instructions_template: '' },
+    include_skills_usage_instructions: source?.include_skills_usage_instructions ?? false,
+    include_plugin_usage_instructions: source?.include_plugin_usage_instructions ?? false,
+    include_apps_usage_instructions: source?.include_apps_usage_instructions ?? false,
+    supports_reasoning_summary_parameter: source?.supports_reasoning_summary_parameter ?? true,
+    default_reasoning_summary: source?.default_reasoning_summary ?? 'auto',
+    support_verbosity: source?.support_verbosity ?? false,
+    default_verbosity: source?.default_verbosity ?? null,
+    apply_patch_tool_type: source?.apply_patch_tool_type ?? null,
+    web_search_tool_type: source?.web_search_tool_type || 'text',
+    truncation_policy: source?.truncation_policy || 'auto',
+    supports_image_detail_original: source?.supports_image_detail_original ?? false,
+    supports_parallel_tool_calls: source?.supports_parallel_tool_calls ?? true,
+    context_window: source?.context_window ?? 500000,
+    max_context_window: source?.max_context_window ?? 500000,
+    auto_compact_token_limit: source?.auto_compact_token_limit ?? null,
+    comp_hash: source?.comp_hash ?? null,
+    effective_context_window_percent: source?.effective_context_window_percent ?? 95,
+    experimental_supported_tools: Array.isArray(source?.experimental_supported_tools) ? source.experimental_supported_tools : [],
+    input_modalities: Array.isArray(source?.input_modalities) ? source.input_modalities : ['text'],
+    supports_search_tool: source?.supports_search_tool ?? false,
+    use_responses_lite: source?.use_responses_lite ?? false,
+    node_repl_auto_review_required: source?.node_repl_auto_review_required ?? false,
+    node_repl_disabled: source?.node_repl_disabled ?? false,
+    auto_review_model_override: source?.auto_review_model_override ?? null,
+    model_specialty: source?.model_specialty ?? null,
+    tool_mode: source?.tool_mode ?? null,
+    multi_agent_version: source?.multi_agent_version ?? null,
+    ...source,
+    slug,
+    display_name: displayName,
+    truncation_policy: {
+      mode: 'bytes',
+      limit: 10000
+    }
+  };
+}
+
+async function saveModelCache(payload = {}) {
+  const target = modelCachePath();
+  const inputs = Array.isArray(payload.models) ? payload.models : [];
+  if (!inputs.length) throw new Error('没有可保存的模型');
+  const models = [];
+  const seen = new Set();
+  for (const input of inputs) {
+    const entry = modelCacheEntry(input);
+    if (seen.has(entry.slug)) continue;
+    seen.add(entry.slug);
+    models.push(entry);
+  }
+  await fs.mkdir(path.dirname(target), { recursive: true });
+  await fs.writeFile(target, `${JSON.stringify({ models }, null, 2)}\n`, 'utf8');
+  return { ok: true, path: target, count: models.length };
+}
+
+async function fetchProviderModels(payload = {}) {
+  const endpoint = providerModelsEndpoint(payload.baseUrl);
+  allowLocalOidcCertificate(endpoint);
+  const apiKey = String(payload.apiKey || '').trim();
+  if (/\r|\n/.test(apiKey)) throw new Error('API Key 不能包含换行符');
+  const headers = { Accept: 'application/json' };
+  if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+  const response = await fetch(endpoint, { headers });
+  const rawBody = await response.text();
+  if (!response.ok) {
+    throw new Error(`模型列表请求失败（HTTP ${response.status}）。\n请求地址：${endpoint}\n回包：${rawBody || '(空响应)'}`);
+  }
+  let payloadJson;
+  try {
+    payloadJson = JSON.parse(rawBody);
+  } catch {
+    throw new Error(`模型列表回包不是有效 JSON。\n请求地址：${endpoint}\n回包：${rawBody || '(空响应)'}`);
+  }
+  return normalizeModels(payloadJson);
 }
 
 async function readConfig(targetPath) {
@@ -790,6 +1029,7 @@ async function logout() {
 }
 
 function createWindow() {
+  if (process.platform === 'darwin') app.dock?.show();
   mainWindow = new BrowserWindow({
     width: 1360,
     height: 900,
@@ -811,24 +1051,8 @@ function createWindow() {
   mainWindow.setMenuBarVisibility(false);
   mainWindow.on('close', (event) => {
     if (isQuitting) return;
-    if (closePromptInFlight) {
-      event.preventDefault();
-      return;
-    }
     event.preventDefault();
-    closePromptInFlight = true;
-    (async () => {
-      const settings = await readWindowSettings();
-      if (!settings.closeChoiceSet) {
-        mainWindow.webContents.send('window:close-requested', settings);
-        return;
-      }
-      closePromptInFlight = false;
-      applyWindowClose(settings.minimizeToTray);
-    })().catch((error) => {
-      closePromptInFlight = false;
-      dialog.showErrorBox('关闭失败', error.message || String(error));
-    });
+    void requestWindowClose();
   });
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 }
@@ -842,6 +1066,7 @@ ipcMain.handle('config:save', (_event, payload) => saveConfig(payload?.path, Str
 ipcMain.handle('config:list-backups', (_event, targetPath) => listBackups(targetPath));
 ipcMain.handle('config:read-backup', (_event, backupPath) => readBackup(backupPath));
 ipcMain.handle('config:delete-backup', (_event, targetPath, backupPath) => deleteBackup(targetPath, backupPath));
+ipcMain.handle('config:save-model-cache', (_event, payload) => saveModelCache(payload || {}));
 ipcMain.handle('config:open-folder', async (_event, targetPath) => {
   const filePath = targetPath || findConfigPath();
   await fs.mkdir(path.dirname(filePath), { recursive: true });
@@ -866,6 +1091,7 @@ ipcMain.handle('config:choose-file', async () => {
 ipcMain.handle('oidc:read-settings', () => readOidcSettings());
 ipcMain.handle('oidc:save-settings', (_event, settings) => saveOidcSettings(settings || {}));
 ipcMain.handle('oidc:api-keys', fetchApiKeys);
+ipcMain.handle('provider:models', (_event, payload) => fetchProviderModels(payload || {}));
 ipcMain.handle('auth:status', getAuthStatus);
 ipcMain.handle('auth:login', startOidcLogin);
 ipcMain.handle('auth:cancel-login', cancelOidcLogin);
@@ -882,19 +1108,31 @@ ipcMain.handle('auth:open-last-url', async () => {
   return { ok: true, url: lastAuthorizationUrl };
 });
 async function findRunningChatGPT() {
-  if (process.platform !== 'win32') return null;
   try {
-    const command = "(Get-Process -Name 'ChatGPT' -ErrorAction SilentlyContinue | Select-Object -First 1).Id";
-    const { stdout } = await execFileAsync('powershell.exe', [
-      '-NoProfile', '-NonInteractive', '-Command', command
-    ], { windowsHide: true });
-    return stdout.trim() ? { processName: CHATGPT_PROCESS_NAME } : null;
+    if (process.platform === 'win32') {
+      const command = "(Get-Process -Name 'ChatGPT' -ErrorAction SilentlyContinue | Select-Object -First 1).Id";
+      const { stdout } = await execFileAsync('powershell.exe', [
+        '-NoProfile', '-NonInteractive', '-Command', command
+      ], { windowsHide: true });
+      return stdout.trim() ? { processName: CHATGPT_PROCESS_NAME } : null;
+    }
+    if (process.platform === 'darwin') {
+      try {
+        const { stdout } = await execFileAsync('pgrep', ['-x', 'ChatGPT']);
+        if (stdout.trim()) return { processName: 'ChatGPT' };
+      } catch {
+        // The packaged macOS process can report its full application path.
+      }
+      const { stdout } = await execFileAsync('pgrep', ['-f', '/ChatGPT.app/Contents/MacOS/ChatGPT']);
+      return stdout.trim() ? { processName: 'ChatGPT' } : null;
+    }
   } catch {
     return null;
   }
+  return null;
 }
 
-async function waitForChatGPTStart(timeoutMs = 8000) {
+async function waitForChatGPTStart(timeoutMs = 15000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (await findRunningChatGPT()) return true;
@@ -905,6 +1143,10 @@ async function waitForChatGPTStart(timeoutMs = 8000) {
 
 async function startChatGPT() {
   try {
+    if (process.platform === 'darwin') {
+      await execFileAsync('open', ['-a', 'ChatGPT']);
+      return waitForChatGPTStart();
+    }
     await shell.openExternal('codex://');
     return waitForChatGPTStart();
   } catch {
@@ -925,7 +1167,12 @@ ipcMain.handle('codex:restart', async () => {
   const runningChatGPT = await findRunningChatGPT();
   if (runningChatGPT) {
     try {
-      await execFileAsync('taskkill.exe', ['/IM', CHATGPT_PROCESS_NAME, '/T', '/F'], { windowsHide: true });
+      if (process.platform === 'win32') {
+        await execFileAsync('taskkill.exe', ['/IM', CHATGPT_PROCESS_NAME, '/T', '/F'], { windowsHide: true });
+      } else if (process.platform === 'darwin') {
+        try { await execFileAsync('pkill', ['-x', 'ChatGPT']); }
+        catch { await execFileAsync('pkill', ['-f', '/ChatGPT.app/Contents/MacOS/ChatGPT']); }
+      }
     } catch {
       // The process may have exited between detection and taskkill.
     }
@@ -970,12 +1217,23 @@ ipcMain.on('window:toggle-maximize', () => {
   if (mainWindow.isMaximized()) mainWindow.unmaximize();
   else mainWindow.maximize();
 });
-ipcMain.on('window:close', () => mainWindow?.close());
+ipcMain.on('window:close', () => { void requestWindowClose(); });
 
 app.whenReady().then(async () => {
   if (!hasSingleInstanceLock) return;
   await migrateLegacyUserData();
+  if (process.platform === 'darwin') {
+    app.dock?.show();
+    app.dock?.setIcon(createMacDockIcon());
+  }
   Menu.setApplicationMenu(null);
+  // Keep the macOS status-bar item alive for the lifetime of the app. Creating
+  // it only after the first close is unreliable in some packaged macOS builds.
+  try {
+    ensureTray();
+  } catch (error) {
+    dialog.showErrorBox('macOS 菜单栏图标初始化失败', `${error.message}\n\n日志：${path.join(os.tmpdir(), 'opentk-tray.log')}`);
+  }
   createWindow();
   configureAutoUpdater();
   if (app.isPackaged) setTimeout(checkForUpdates, 5000);
@@ -986,6 +1244,7 @@ app.whenReady().then(async () => {
 
 app.on('before-quit', () => {
   isQuitting = true;
+  if (process.platform === 'darwin') app.dock?.show();
   if (activeLoginServer?.listening) activeLoginServer.close();
   tray?.destroy();
   tray = null;

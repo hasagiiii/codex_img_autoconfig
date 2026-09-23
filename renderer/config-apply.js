@@ -66,6 +66,7 @@
 
   function updateBaseUrl(content, baseUrl) {
     const value = String(baseUrl || '').trim();
+    if (/\r|\n/.test(value)) throw new Error('Base URL 不能包含换行符');
     if (!/^https?:\/\//i.test(value)) throw new Error('Base URL 必须以 http:// 或 https:// 开头');
     const newline = newlineFor(content);
     const hadTrailingNewline = /\r?\n$/.test(content);
@@ -87,11 +88,56 @@
       if (found) return null;
       found = true;
       return `base_url = "${value}"`;
-    }).filter(Boolean);
+    }).filter((line) => line !== null);
     if (!found) section.push(`base_url = "${value}"`);
     lines.splice(start + 1, end - start - 1, ...section);
     return `${lines.join(newline)}${hadTrailingNewline ? newline : ''}`;
   }
 
-  window.ConfigApply = { updateTomlProvider, updateBaseUrl, updateEnv };
+  function updateModel(content, model) {
+    const value = String(model || '').trim();
+    if (!value) throw new Error('模型不能为空');
+    if (/\r|\n/.test(value)) throw new Error('模型不能包含换行符');
+    const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    const newline = newlineFor(content);
+    const hadTrailingNewline = /\r?\n$/.test(content);
+    const lines = content ? content.split(/\r?\n/) : [];
+    if (hadTrailingNewline) lines.pop();
+    const tablePattern = /^\s*\[\[?[^\]]+\]\]?\s*(?:#.*)?$/;
+    const topLevelEnd = lines.findIndex((line) => tablePattern.test(line));
+    const topLevelLimit = topLevelEnd < 0 ? lines.length : topLevelEnd;
+    let found = false;
+    const updated = lines.map((line, index) => {
+      if (index >= topLevelLimit || !/^\s*model\s*=/.test(line)) return line;
+      if (found) return null;
+      found = true;
+      return `model = "${escaped}"`;
+    }).filter((line) => line !== null);
+    if (!found) updated.unshift(`model = "${escaped}"`);
+    return `${updated.join(newline)}${newline}`;
+  }
+
+  function updateModelCatalogJson(content, catalogPath = '~/.codex/models_cache.json') {
+    const value = String(catalogPath || '').trim();
+    if (!value || /[\r\n]/.test(value)) throw new Error('模型缓存路径不能为空或包含换行符');
+    const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    const newline = newlineFor(content);
+    const hadTrailingNewline = /\r?\n$/.test(content);
+    const lines = content ? content.split(/\r?\n/) : [];
+    if (hadTrailingNewline) lines.pop();
+    const tablePattern = /^\s*\[\[?[^\]]+\]\]?\s*(?:#.*)?$/;
+    const topLevelLimit = lines.findIndex((line) => tablePattern.test(line));
+    const limit = topLevelLimit < 0 ? lines.length : topLevelLimit;
+    let found = false;
+    const updated = lines.map((line, index) => {
+      if (index >= limit || !/^\s*model_catalog_json\s*=/.test(line)) return line;
+      if (found) return null;
+      found = true;
+      return `model_catalog_json = "${escaped}"`;
+    }).filter((line) => line !== null);
+    if (!found) updated.unshift(`model_catalog_json = "${escaped}"`);
+    return `${updated.join(newline)}${newline}`;
+  }
+
+  window.ConfigApply = { updateTomlProvider, updateBaseUrl, updateModel, updateModelCatalogJson, updateEnv };
 })();
