@@ -1,6 +1,6 @@
 {
   "name": "codex-config-studio",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Desktop editor for the Codex configuration file",
   "author": "OpenTk",
   "repository": {
