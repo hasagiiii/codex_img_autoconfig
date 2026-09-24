@@ -35,6 +35,30 @@ const modelCacheDialog = document.querySelector('#model-cache-dialog');
 let modelCacheSelection = [];
 let loginInFlight = false;
 let loginAttempt = 0;
+const navCollapseKey = 'codex-config-nav-collapsed';
+
+function setNavCollapsed(collapsed, persist = true) {
+  const shell = document.querySelector('.app-shell');
+  const button = document.querySelector('#nav-collapse');
+  if (!shell || !button) return;
+  shell.classList.toggle('nav-collapsed', collapsed);
+  button.setAttribute('aria-expanded', String(!collapsed));
+  button.setAttribute('aria-label', collapsed ? '展开菜单' : '收起菜单');
+  button.title = collapsed ? '展开菜单' : '收起菜单';
+  button.querySelector('.nav-collapse-icon').textContent = collapsed ? '›' : '‹';
+  if (persist) {
+    try { localStorage.setItem(navCollapseKey, String(collapsed)); } catch {}
+  }
+}
+
+function initializeNavCollapse() {
+  let collapsed = false;
+  try { collapsed = localStorage.getItem(navCollapseKey) === 'true'; } catch {}
+  setNavCollapsed(collapsed, false);
+  document.querySelector('#nav-collapse').addEventListener('click', () => {
+    setNavCollapsed(!document.querySelector('.app-shell').classList.contains('nav-collapsed'));
+  });
+}
 
 function isAuthFile(path) {
   return /(^|[\\/])auth\.json$/i.test(path || '');
@@ -84,16 +108,42 @@ function currentApiKey() {
     || document.querySelector('#manual-api-key').value.trim();
 }
 
-function renderModels(models, status = '') {
-  providerModels = models;
+function uniqueModels(models) {
+  const seen = new Set();
+  return models.filter((entry) => {
+    const id = String(entry?.id || '').trim();
+    if (!id || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+}
+
+function matchingModels(models, query = '') {
+  const normalizedQuery = String(query || '').trim().toLowerCase();
+  const entries = uniqueModels(models);
+  if (!normalizedQuery) return entries;
+  return entries
+    .filter((entry) => `${entry.id} ${entry.label || ''}`.toLowerCase().includes(normalizedQuery))
+    .sort((left, right) => {
+      const leftId = left.id.toLowerCase();
+      const rightId = right.id.toLowerCase();
+      return Number(!leftId.startsWith(normalizedQuery)) - Number(!rightId.startsWith(normalizedQuery));
+    });
+}
+
+function modelSuggestionSource() {
+  return uniqueModels([...providerModels, ...modelCacheSelection]);
+}
+
+function renderModelMenu(models, query = '') {
   const menu = document.querySelector('#model-menu');
+  const matches = matchingModels(models, query);
   menu.innerHTML = '';
-  if (!models.length) {
-    menu.innerHTML = '<span class="combo-empty">没有可用模型</span>';
-    document.querySelector('#model-status').textContent = status || 'Provider 未返回模型。';
+  if (!matches.length) {
+    menu.innerHTML = `<span class="combo-empty">${query ? '没有匹配的模型' : '没有可用模型'}</span>`;
     return;
   }
-  models.forEach((entry) => {
+  matches.forEach((entry) => {
     const option = document.createElement('button');
     option.type = 'button';
     option.role = 'option';
@@ -107,7 +157,54 @@ function renderModels(models, status = '') {
     });
     menu.append(option);
   });
-  document.querySelector('#model-status').textContent = status || `已加载 ${models.length} 个模型。`;
+}
+
+function renderModels(models, status = '') {
+  providerModels = Array.isArray(models) ? models : [];
+  renderModelMenu(providerModels, document.querySelector('#model-input').value);
+  if (!providerModels.length) {
+    document.querySelector('#model-status').textContent = status || 'Provider 未返回模型。';
+    return;
+  }
+  document.querySelector('#model-status').textContent = status || `已加载 ${providerModels.length} 个模型。`;
+}
+
+function showModelSuggestions(query = '') {
+  const menu = document.querySelector('#model-menu');
+  renderModelMenu(providerModels, query);
+  menu.classList.remove('hidden');
+  document.querySelector('#model-toggle').setAttribute('aria-expanded', 'true');
+}
+
+function renderCustomModelSuggestions(query = '') {
+  const menu = document.querySelector('#custom-model-menu');
+  const matches = matchingModels(modelSuggestionSource(), query);
+  menu.innerHTML = '';
+  if (!matches.length) {
+    menu.classList.add('hidden');
+    return;
+  }
+  matches.forEach((entry) => {
+    const option = document.createElement('button');
+    option.type = 'button';
+    option.role = 'option';
+    option.dataset.value = entry.id;
+    option.textContent = entry.label === entry.id ? entry.id : `${entry.label} · ${entry.id}`;
+    option.title = entry.id;
+    option.addEventListener('click', () => {
+      document.querySelector('#custom-model-name').value = entry.id;
+      menu.classList.add('hidden');
+      document.querySelector('#custom-model-name').focus();
+    });
+    menu.append(option);
+  });
+  menu.classList.remove('hidden');
+}
+
+function hideModelSuggestions() {
+  document.querySelector('#model-menu').classList.add('hidden');
+  document.querySelector('#model-toggle').setAttribute('aria-expanded', 'false');
+  document.querySelector('#custom-model-menu').classList.add('hidden');
 }
 
 function renderModelCacheSelection() {
@@ -147,12 +244,19 @@ function renderModelCacheSelection() {
 
 function openModelCacheDialog() {
   const current = document.querySelector('#model-input').value.trim();
-  const source = providerModels.length ? providerModels : (current ? [{ id: current, label: current }] : []);
-  const seen = new Set();
-  modelCacheSelection = source.filter((entry) => entry?.id && !seen.has(entry.id) && seen.add(entry.id)).map((entry) => ({ ...entry }));
-  document.querySelector('#custom-model-name').value = '';
+  const source = modelSuggestionSource();
+  if (current && !source.some((entry) => entry.id === current)) source.push({ id: current, label: current });
+  modelCacheSelection = uniqueModels(source).map((entry) => ({ ...entry }));
+  const input = document.querySelector('#custom-model-name');
+  input.value = '';
   renderModelCacheSelection();
   if (!modelCacheDialog.open) modelCacheDialog.showModal();
+  input.focus();
+  if (!providerModels.length) {
+    loadProviderModels().then(() => {
+      if (modelCacheDialog.open) renderCustomModelSuggestions(input.value);
+    });
+  }
 }
 
 async function saveCustomModels(models) {
@@ -213,6 +317,9 @@ async function loadProviderModels() {
     const models = await api.provider.models(selectedBaseUrl, apiKey);
     if (request !== modelRequest) return;
     renderModels(models);
+    if (modelCacheDialog.open) {
+      renderCustomModelSuggestions(document.querySelector('#custom-model-name').value);
+    }
   } catch (error) {
     if (request !== modelRequest) return;
     renderModels([], error.message);
@@ -998,8 +1105,17 @@ document.querySelector('#history-toggle').addEventListener('click', () => {
 });
 document.addEventListener('click', (event) => {
   if (!event.target.closest('#history-control')) setHistoryOpen(false);
+  if (!event.target.closest('.model-control') && !event.target.closest('.model-cache-input-wrap')) {
+    hideModelSuggestions();
+  }
 });
 document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' &&
+      (!document.querySelector('#model-menu').classList.contains('hidden') ||
+       !document.querySelector('#custom-model-menu').classList.contains('hidden'))) {
+    hideModelSuggestions();
+    return;
+  }
   if (event.key === 'Escape' && !document.querySelector('#history-panel').classList.contains('hidden')) {
     setHistoryOpen(false);
     document.querySelector('#history-toggle').focus();
@@ -1072,17 +1188,31 @@ document.querySelector('#model-input').addEventListener('input', (event) => {
   const value = event.target.value.replace(/[\r\n]/g, '');
   if (value !== event.target.value) event.target.value = value;
   model = value;
+  showModelSuggestions(value);
+  if (!providerModels.length) scheduleLoadProviderModels();
+});
+document.querySelector('#model-input').addEventListener('focus', () => {
+  showModelSuggestions(document.querySelector('#model-input').value);
 });
 document.querySelector('#model-input').addEventListener('keydown', (event) => {
   if (event.key === 'Enter') event.preventDefault();
 });
 document.querySelector('#save-custom-model').addEventListener('click', openModelCacheDialog);
+document.querySelector('#custom-model-name').addEventListener('input', (event) => {
+  const value = event.target.value.replace(/[\r\n]/g, '');
+  if (value !== event.target.value) event.target.value = value;
+  renderCustomModelSuggestions(value);
+});
+document.querySelector('#custom-model-name').addEventListener('focus', (event) => {
+  renderCustomModelSuggestions(event.target.value);
+});
 document.querySelector('#add-custom-model').addEventListener('click', () => {
   const input = document.querySelector('#custom-model-name');
   const value = input.value.trim().replace(/[\r\n]/g, '');
   if (!value) return;
   if (!modelCacheSelection.some((entry) => entry.id === value)) modelCacheSelection.push({ id: value, label: value });
   input.value = '';
+  document.querySelector('#custom-model-menu').classList.add('hidden');
   renderModelCacheSelection();
   input.focus();
 });
@@ -1098,8 +1228,8 @@ document.querySelector('#confirm-model-cache').addEventListener('click', () => s
 document.querySelector('#model-toggle').addEventListener('click', () => {
   const menu = document.querySelector('#model-menu');
   const open = menu.classList.contains('hidden');
-  menu.classList.toggle('hidden', !open);
-  document.querySelector('#model-toggle').setAttribute('aria-expanded', String(open));
+  if (open) showModelSuggestions(document.querySelector('#model-input').value);
+  else hideModelSuggestions();
   if (open) loadProviderModels();
 });
 document.querySelector('#api-key-toggle').addEventListener('click', () => {
@@ -1277,5 +1407,6 @@ api.update.onChanged(renderUpdateState);
 setInterval(async () => {
   try { renderAuthStatus(await api.oidc.status()); } catch { /* Retry on the next tick. */ }
 }, 60000);
+initializeNavCollapse();
 renderApiKeyMode();
 Promise.all([initializeEditorAndConfig(), loadOidcSettings(), loadWindowSettings(), refreshAuthStatus(), loadUpdateStatus()]);

@@ -135,6 +135,14 @@ test('Base URL application preserves provider section and supports custom values
   assert.equal((output.match(/base_url\s*=/g) || []).length, 1);
 });
 
+test('Base URL application separates a table header accidentally glued to the provider section', () => {
+  const apply = configApply();
+  const input = '[model_providers.custom]\nname = "Sub2API"\nenv_key = "OPENAI_API_KEY"\nbase_url = "https://old.example" [projects."/tmp/project"] trust_level = "trusted".';
+  const output = apply.updateBaseUrl(input, 'https://custom.example');
+  assert.match(output, /env_key = "OPENAI_API_KEY"\nbase_url = "https:\/\/custom\.example"\n\[projects\."\/tmp\/project"\]\ntrust_level = "trusted"\./);
+  assert.doesNotMatch(output, /custom\.example" \[projects/);
+});
+
 test('opening backup switches inline editor and preserves current draft', async () => {
   const elements = new Map();
   function element(id) {

@@ -37,9 +37,12 @@ const LEGACY_REDIRECT_URIS = new Set([
   'http://localhost:53682/oauth/callback',
   'http://127.0.0.1:53682/oauth/callback'
 ]);
+const LEGACY_OIDC_CLIENT_IDS = new Set([
+  'rp_f226saroedw7mluvsqg5co4mlm'
+]);
 const DEFAULT_OIDC_SETTINGS = {
   issuer: 'https://opentk.ai',
-  clientId: 'rp_f226saroedw7mluvsqg5co4mlm',
+  clientId: 'rp_bbmuek3vawcpuwbqulapgq246i',
   clientAuthMethod: 'none',
   scopes: 'openid profile email offline_access sub2api:apikey',
   redirectUri: DEFAULT_REDIRECT_URI
@@ -435,9 +438,12 @@ async function readOidcSettings() {
   const storedRedirectUri = LEGACY_REDIRECT_URIS.has(stored.redirectUri)
     ? DEFAULT_REDIRECT_URI
     : stored.redirectUri;
+  const storedClientId = LEGACY_OIDC_CLIENT_IDS.has(stored.clientId)
+    ? DEFAULT_OIDC_SETTINGS.clientId
+    : stored.clientId;
   const settings = {
     issuer: String(stored.issuer || DEFAULT_OIDC_SETTINGS.issuer),
-    clientId: String(stored.clientId || DEFAULT_OIDC_SETTINGS.clientId),
+    clientId: String(storedClientId || DEFAULT_OIDC_SETTINGS.clientId),
     clientAuthMethod: 'none',
     scopes: String(stored.scopes || DEFAULT_OIDC_SETTINGS.scopes),
     redirectUri: storedRedirectUri || DEFAULT_REDIRECT_URI
@@ -445,7 +451,8 @@ async function readOidcSettings() {
   const hasLegacySecret = Object.prototype.hasOwnProperty.call(stored, 'clientSecretProtected') ||
     Object.prototype.hasOwnProperty.call(stored, 'clientSecret');
   const migratedRedirectUri = typeof stored.redirectUri === 'string' && storedRedirectUri !== stored.redirectUri;
-  if (hasLegacySecret || (stored.clientAuthMethod && stored.clientAuthMethod !== 'none') || migratedRedirectUri) {
+  const migratedClientId = typeof stored.clientId === 'string' && storedClientId !== stored.clientId;
+  if (hasLegacySecret || (stored.clientAuthMethod && stored.clientAuthMethod !== 'none') || migratedRedirectUri || migratedClientId) {
     await fs.mkdir(path.dirname(oidcSettingsPath()), { recursive: true });
     await fs.writeFile(oidcSettingsPath(), JSON.stringify(settings, null, 2), 'utf8');
   }
@@ -1142,11 +1149,20 @@ async function waitForChatGPTStart(timeoutMs = 15000) {
 }
 
 async function startChatGPT() {
-  try {
-    if (process.platform === 'darwin') {
-      await execFileAsync('open', ['-a', 'ChatGPT']);
-      return waitForChatGPTStart();
+  if (process.platform === 'darwin') {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        await execFileAsync('open', ['-a', 'ChatGPT']);
+      } catch {
+        // Launch Services can briefly refuse the reopen while the previous
+        // instance is still shutting down, so retry below.
+      }
+      if (await waitForChatGPTStart(5000)) return true;
+      await new Promise((resolve) => setTimeout(resolve, 500));
     }
+    return false;
+  }
+  try {
     await shell.openExternal('codex://');
     return waitForChatGPTStart();
   } catch {
@@ -1163,25 +1179,47 @@ async function waitForChatGPTExit(timeoutMs = 5000) {
   return !(await findRunningChatGPT());
 }
 
-ipcMain.handle('codex:restart', async () => {
-  const runningChatGPT = await findRunningChatGPT();
-  if (runningChatGPT) {
+async function stopChatGPT() {
+  if (process.platform === 'win32') {
     try {
-      if (process.platform === 'win32') {
-        await execFileAsync('taskkill.exe', ['/IM', CHATGPT_PROCESS_NAME, '/T', '/F'], { windowsHide: true });
-      } else if (process.platform === 'darwin') {
-        try { await execFileAsync('pkill', ['-x', 'ChatGPT']); }
-        catch { await execFileAsync('pkill', ['-f', '/ChatGPT.app/Contents/MacOS/ChatGPT']); }
-      }
+      await execFileAsync('taskkill.exe', ['/IM', CHATGPT_PROCESS_NAME, '/T', '/F'], { windowsHide: true });
     } catch {
       // The process may have exited between detection and taskkill.
     }
-    if (!(await waitForChatGPTExit())) {
-      return { restarted: false, started: false, processName: CHATGPT_PROCESS_NAME };
-    }
+    return waitForChatGPTExit();
   }
-  const startedChatGPT = await startChatGPT();
-  return { restarted: startedChatGPT, started: startedChatGPT, processName: CHATGPT_PROCESS_NAME };
+  if (process.platform !== 'darwin') return true;
+
+  const processPatterns = [
+    ['-x', 'ChatGPT'],
+    ['-f', '/ChatGPT.app/Contents/MacOS/ChatGPT']
+  ];
+  await Promise.all(processPatterns.map((args) =>
+    execFileAsync('pkill', ['-TERM', ...args]).catch(() => null)));
+  if (await waitForChatGPTExit(7000)) return true;
+
+  await Promise.all(processPatterns.map((args) =>
+    execFileAsync('pkill', ['-KILL', ...args]).catch(() => null)));
+  return waitForChatGPTExit(3000);
+}
+
+let restartChatGPTPromise = null;
+
+ipcMain.handle('codex:restart', () => {
+  if (restartChatGPTPromise) return restartChatGPTPromise;
+  restartChatGPTPromise = (async () => {
+    const runningChatGPT = await findRunningChatGPT();
+    if (runningChatGPT) {
+      if (!(await stopChatGPT())) {
+        return { restarted: false, started: false, processName: CHATGPT_PROCESS_NAME };
+      }
+    }
+    const startedChatGPT = await startChatGPT();
+    return { restarted: startedChatGPT, started: startedChatGPT, processName: CHATGPT_PROCESS_NAME };
+  })().finally(() => {
+    restartChatGPTPromise = null;
+  });
+  return restartChatGPTPromise;
 });
 ipcMain.handle('update:status', () => updateState);
 ipcMain.handle('update:check', checkForUpdates);

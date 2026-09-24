@@ -9,7 +9,17 @@
     return content.includes('\r\n') ? '\r\n' : '\n';
   }
 
+  function normalizeTomlContent(content) {
+    // A previous write could concatenate a new table header to the preceding
+    // assignment when the source file had no trailing newline. Split that
+    // header before any further section edits so fields stay in their table.
+    return String(content || '')
+      .replace(/[ \t]+(?=\[\[?[A-Za-z_])/g, '\n')
+      .replace(/^(\s*\[\[?[^\r\n\]]+\]\]?)[ \t]+(?=[A-Za-z0-9_-]+\s*=)/gm, '$1\n');
+  }
+
   function updateTomlProvider(content) {
+    content = normalizeTomlContent(content);
     const newline = newlineFor(content);
     const hadTrailingNewline = /\r?\n$/.test(content);
     const lines = content ? content.split(/\r?\n/) : [];
@@ -65,6 +75,7 @@
   }
 
   function updateBaseUrl(content, baseUrl) {
+    content = normalizeTomlContent(content);
     const value = String(baseUrl || '').trim();
     if (/\r|\n/.test(value)) throw new Error('Base URL 不能包含换行符');
     if (!/^https?:\/\//i.test(value)) throw new Error('Base URL 必须以 http:// 或 https:// 开头');

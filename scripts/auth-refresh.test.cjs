@@ -65,7 +65,8 @@ test('legacy OIDC settings are rewritten without Client Secret', async () => {
   };
   const context = vm.createContext({
     URL, Object,
-    DEFAULT_OIDC_SETTINGS: { issuer: 'https://opentk.ai', clientId: 'rp_f226saroedw7mluvsqg5co4mlm', clientAuthMethod: 'none', scopes: 'openid profile email offline_access sub2api:apikey', redirectUri: 'http://localhost:53777/oauth/callback' },
+    DEFAULT_OIDC_SETTINGS: { issuer: 'https://opentk.ai', clientId: 'rp_bbmuek3vawcpuwbqulapgq246i', clientAuthMethod: 'none', scopes: 'openid profile email offline_access sub2api:apikey', redirectUri: 'http://localhost:53777/oauth/callback' },
+    LEGACY_OIDC_CLIENT_IDS: new Set(['rp_f226saroedw7mluvsqg5co4mlm']),
     DEFAULT_REDIRECT_URI: 'http://localhost:53777/oauth/callback',
     LEGACY_REDIRECT_URIS: new Set([
       'http://localhost:53682/oauth/callback',
@@ -94,6 +95,63 @@ test('legacy OIDC settings are rewritten without Client Secret', async () => {
   await context.saveOidcSettings({ ...settings, clientSecret: 'must-not-be-saved' });
   assert.equal('clientSecret' in writes[0], false);
   assert.equal(writes[0].clientAuthMethod, 'none');
+});
+
+test('legacy default Client ID migrates to the current default', async () => {
+  const writes = [];
+  const legacy = {
+    issuer: 'https://opentk.ai', clientId: 'rp_f226saroedw7mluvsqg5co4mlm',
+    clientAuthMethod: 'none', scopes: 'openid',
+    redirectUri: 'http://localhost:53777/oauth/callback'
+  };
+  const context = vm.createContext({
+    URL, Object,
+    DEFAULT_OIDC_SETTINGS: { issuer: 'https://opentk.ai', clientId: 'rp_bbmuek3vawcpuwbqulapgq246i', clientAuthMethod: 'none', scopes: 'openid profile email offline_access sub2api:apikey', redirectUri: 'http://localhost:53777/oauth/callback' },
+    DEFAULT_REDIRECT_URI: 'http://localhost:53777/oauth/callback',
+    LEGACY_REDIRECT_URIS: new Set(['http://localhost:53682/oauth/callback']),
+    LEGACY_OIDC_CLIENT_IDS: new Set(['rp_f226saroedw7mluvsqg5co4mlm']),
+    readJson: async () => legacy,
+    oidcSettingsPath: () => 'settings.json',
+    path: { dirname: () => '.' },
+    fs: {
+      mkdir: async () => {},
+      writeFile: async (_path, value) => writes.push(JSON.parse(value))
+    }
+  });
+  const settingsSource = main.slice(main.indexOf('async function readOidcSettings('), main.indexOf('let tokenRefreshPromise'));
+  vm.runInContext(settingsSource, context);
+  const settings = await context.readOidcSettings();
+  assert.equal(settings.clientId, 'rp_bbmuek3vawcpuwbqulapgq246i');
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].clientId, 'rp_bbmuek3vawcpuwbqulapgq246i');
+});
+
+test('a user supplied Client ID is never overwritten by the default', async () => {
+  const writes = [];
+  const custom = {
+    issuer: 'https://localhost:8443', clientId: 'rp_3rbigrwfzn7tyfqws2m47olssi',
+    clientAuthMethod: 'none', scopes: 'openid',
+    redirectUri: 'http://localhost:53777/oauth/callback'
+  };
+  const context = vm.createContext({
+    URL, Object,
+    DEFAULT_OIDC_SETTINGS: { issuer: 'https://opentk.ai', clientId: 'rp_bbmuek3vawcpuwbqulapgq246i', clientAuthMethod: 'none', scopes: 'openid profile email offline_access sub2api:apikey', redirectUri: 'http://localhost:53777/oauth/callback' },
+    DEFAULT_REDIRECT_URI: 'http://localhost:53777/oauth/callback',
+    LEGACY_REDIRECT_URIS: new Set(['http://localhost:53682/oauth/callback']),
+    LEGACY_OIDC_CLIENT_IDS: new Set(['rp_f226saroedw7mluvsqg5co4mlm']),
+    readJson: async () => custom,
+    oidcSettingsPath: () => 'settings.json',
+    path: { dirname: () => '.' },
+    fs: {
+      mkdir: async () => {},
+      writeFile: async (_path, value) => writes.push(JSON.parse(value))
+    }
+  });
+  const settingsSource = main.slice(main.indexOf('async function readOidcSettings('), main.indexOf('let tokenRefreshPromise'));
+  vm.runInContext(settingsSource, context);
+  const settings = await context.readOidcSettings();
+  assert.equal(settings.clientId, 'rp_3rbigrwfzn7tyfqws2m47olssi');
+  assert.equal(writes.length, 0);
 });
 
 test('missing replacement refresh token preserves original', async () => {

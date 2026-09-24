@@ -18,25 +18,31 @@
         </div>
       </header>
       <aside class="app-nav">
-        <div class="brand">
-          <div class="brand-mark">C</div>
-          <div>
-            <strong>OpenTk</strong>
-            <span>Codex配置工具</span>
+        <div class="nav-header">
+          <div class="brand">
+            <div class="brand-mark">C</div>
+            <div class="brand-copy">
+              <strong>OpenTk</strong>
+              <span>Codex配置工具</span>
+            </div>
           </div>
         </div>
 
         <nav class="nav-list" aria-label="主导航">
           <div class="nav-section-title">Codex配置</div>
-          <button class="nav-item active" data-view="codex-view">
+          <button class="nav-item active" data-view="codex-view" aria-label="Codex配置" title="Codex配置">
             <span class="nav-icon">⌘</span><span>Codex配置</span>
           </button>
         </nav>
 
         <div class="nav-footer">
+          <button class="nav-collapse" id="nav-collapse" type="button" aria-expanded="true" aria-label="收起菜单" title="收起菜单">
+            <span class="nav-collapse-icon" aria-hidden="true">‹</span>
+            <span class="nav-collapse-label">收起菜单</span>
+          </button>
           <div class="nav-bottom-links">
-            <button class="nav-login" id="nav-login" aria-haspopup="dialog" aria-controls="login-dialog"><span class="nav-icon codicon codicon-sign-in" aria-hidden="true"></span><span>登录</span></button>
-            <button class="nav-login" data-view="oidc-view"><span class="nav-icon codicon codicon-settings-gear" aria-hidden="true"></span><span>设置</span></button>
+            <button class="nav-login" id="nav-login" aria-label="登录" title="登录" aria-haspopup="dialog" aria-controls="login-dialog"><span class="nav-icon codicon codicon-sign-in" aria-hidden="true"></span><span>登录</span></button>
+            <button class="nav-login" data-view="oidc-view" aria-label="设置" title="设置"><span class="nav-icon codicon codicon-settings-gear" aria-hidden="true"></span><span>设置</span></button>
           </div>
           <div class="nav-account-wrap hidden" id="nav-account-wrap">
             <button class="nav-account" id="nav-account" title="打开账户菜单" aria-haspopup="menu" aria-expanded="false">
@@ -253,7 +259,7 @@
 
               <label class="field">
                 <span>Client ID</span>
-                <input id="oidc-client-id" type="text" placeholder="rp_f226saroedw7mluvsqg5co4mlm" autocomplete="off" />
+                <input id="oidc-client-id" type="text" placeholder="rp_bbmuek3vawcpuwbqulapgq246i" autocomplete="off" />
               </label>
 
               <div class="field">
@@ -317,7 +323,10 @@
           <div class="model-cache-body">
             <p class="model-cache-hint">确认要写入 <code>models_cache.json</code> 的模型。可以添加或移除模型。</p>
             <div class="model-cache-add-row">
-              <input id="custom-model-name" type="text" placeholder="输入模型名称" autocomplete="off" spellcheck="false" aria-label="新增模型名称">
+              <div class="model-cache-input-wrap">
+                <input id="custom-model-name" type="text" placeholder="输入模型名称" autocomplete="off" spellcheck="false" aria-label="新增模型名称">
+                <div class="combo-menu custom-model-menu hidden" id="custom-model-menu" role="listbox"></div>
+              </div>
               <button class="button button-secondary" id="add-custom-model" type="button">添加</button>
             </div>
             <div class="model-cache-list" id="model-cache-list" role="list"></div>
