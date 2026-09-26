@@ -246,6 +246,7 @@
           <nav class="segmented settings-tabs" aria-label="设置分类">
             <button class="segment active" type="button" data-settings-panel="app-settings-panel">常规设置</button>
             <button class="segment" type="button" data-settings-panel="oidc-panel">OIDC 配置</button>
+            <button class="segment" type="button" data-settings-panel="about-panel">关于</button>
           </nav>
 
           <section class="config-panel active" id="app-settings-panel">
@@ -319,7 +320,16 @@
                 <small>请把此地址加入 Provider 的 Allowed Redirect URIs。</small>
               </label>
 
-              <section class="update-settings field-wide" aria-labelledby="update-heading">
+              </form>
+            </div>
+          </section>
+
+          <section class="config-panel" id="about-panel">
+            <div class="about-panel-content">
+              <div class="section-kicker">OpenTk</div>
+              <h2>关于 OpenTk</h2>
+              <p>管理本机 Codex 配置、供应商和 OIDC 登录。</p>
+              <section class="update-settings" aria-labelledby="update-heading">
                 <div class="update-copy">
                   <span id="update-heading">应用更新</span>
                   <strong id="update-status">正在读取版本信息</strong>
@@ -334,7 +344,6 @@
                   <button class="button button-primary hidden" id="install-update" type="button">重启并安装</button>
                 </div>
               </section>
-              </form>
             </div>
           </section>
         </section>

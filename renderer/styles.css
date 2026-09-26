@@ -140,6 +140,7 @@ button { cursor: pointer; }
 .oidc-provider-directory { flex: 0 0 auto; padding: 22px 30px 0; }
 .oidc-provider-directory-header { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
 .oidc-provider-directory-header h2 { margin: 6px 0 0; font-size: 18px; }
+.oidc-provider-directory-header .button { min-height: 30px; padding: 5px 10px; font-size: 12px; }
 .oidc-provider-list { display: grid; gap: 7px; max-height: 170px; margin-top: 14px; overflow-y: auto; }
 .oidc-provider-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 48px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); }
 .oidc-provider-row.active { border-color: var(--accent-strong); background: #1d2926; }
@@ -296,6 +297,10 @@ input:focus, select:focus { border-color: #4d9f89; box-shadow: 0 0 0 3px rgba(11
 .checkbox-row { display: flex; align-items: center; gap: 9px; color: var(--muted); font-size: 12px; }
 .checkbox-row input { width: 14px; height: 14px; accent-color: var(--accent-strong); }
 .update-settings { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px 20px; align-items: center; margin-top: 5px; padding-top: 20px; border-top: 1px solid var(--line); }
+.about-panel-content { min-height: 0; padding: 30px; overflow: auto; }
+.about-panel-content h2 { margin: 8px 0 6px; font-size: 22px; }
+.about-panel-content > p { margin: 0 0 20px; color: var(--muted); font-size: 12px; }
+.about-panel-content .update-settings { max-width: 900px; }
 .update-copy { min-width: 0; display: grid; gap: 5px; }
 .update-copy > span { color: #cbd5d8; font-size: 12px; font-weight: 650; }
 .update-copy strong { overflow: hidden; color: var(--text); font-size: 13px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }

@@ -124,6 +124,10 @@ test('OIDC settings support multiple providers and creation', () => {
   assert.match(renderer, /function startNewOidcProvider\(\)/);
   assert.match(renderer, /providerId: oidcEditingProviderId/);
   assert.match(rendererStyles, /\.oidc-provider-row/);
+  assert.match(rendererIndex, /data-settings-panel="about-panel">关于<\/button>/);
+  assert.match(rendererIndex, /id="about-panel"/);
+  assert.match(rendererIndex, /id="update-heading"/);
+  assert.match(rendererStyles, /\.oidc-provider-directory-header \.button \{ min-height: 30px/);
 });
 
 test('version tags publish a GitHub Release with repository token', () => {
@@ -138,6 +142,14 @@ test('GitHub publishing builds installer and portable artifacts', () => {
   assert.ok(buildScript.includes("@('--win', 'nsis', 'portable'"));
   assert.ok(packageJson.build.nsis);
   assert.ok(packageJson.build.portable);
+});
+
+test('tray supplier switching updates active provider and restarts the app', () => {
+  assert.match(main, /function trayMenuTemplate\(providers = \[\]\)/);
+  assert.match(main, /function activateProviderFromTray\(providerKey\)/);
+  assert.match(main, /setActiveConfigProvider\(content, providerKey\)/);
+  assert.match(main, /await restartChatGPTProcess\(\)/);
+  assert.match(main, /label: '更改供应商'/);
 });
 
 test('macOS builds publish dmg and zip artifacts for both architectures', () => {

@@ -168,6 +168,93 @@ function createMacDockIcon() {
   return nativeImage.createFromBitmap(canvas, { width: canvasSize, height: canvasSize, scaleFactor: 1 });
 }
 
+function readConfigProviders(content) {
+  const lines = String(content || '').split(/\r?\n/);
+  const headerPattern = /^\s*\[\s*model_providers\.([A-Za-z0-9_-]+)\s*\]\s*(?:#.*)?$/;
+  const tablePattern = /^\s*\[\[?[^\]]+\]\]?\s*(?:#.*)?$/;
+  return lines.flatMap((line, index) => {
+    const match = line.match(headerPattern);
+    if (!match) return [];
+    let end = lines.findIndex((nextLine, nextIndex) => nextIndex > index && tablePattern.test(nextLine));
+    if (end < 0) end = lines.length;
+    const section = lines.slice(index + 1, end).join('\n');
+    return [{
+      key: match[1],
+      name: section.match(/^\s*name\s*=\s*["']([^"']*)["']/mi)?.[1] || match[1]
+    }];
+  });
+}
+
+function activeConfigProvider(content) {
+  return String(content || '').match(/^\s*model_provider\s*=\s*["']([A-Za-z0-9_-]+)["']/mi)?.[1] || '';
+}
+
+function setActiveConfigProvider(content, providerKey) {
+  if (!/^[A-Za-z0-9_-]+$/.test(providerKey)) throw new Error('供应商标识无效');
+  const newline = String(content).includes('\r\n') ? '\r\n' : '\n';
+  const lines = String(content || '').split(/\r?\n/);
+  const firstTable = lines.findIndex((line) => /^\s*\[\[?[^\]]+\]\]?/.test(line));
+  const limit = firstTable < 0 ? lines.length : firstTable;
+  const assignment = `model_provider = "${providerKey}"`;
+  let found = false;
+  const updated = lines.map((line, index) => {
+    if (index >= limit || !/^\s*model_provider\s*=/.test(line)) return line;
+    if (found) return null;
+    found = true;
+    return assignment;
+  }).filter((line) => line !== null);
+  if (!found) updated.unshift(assignment);
+  return `${updated.join(newline)}${/\r?\n$/.test(content) ? newline : ''}`;
+}
+
+function trayMenuTemplate(providers = []) {
+  const activeKey = providers.find((provider) => provider.active)?.key;
+  const providerItems = providers.length
+    ? providers.map((provider) => ({
+      label: `${provider.key === activeKey ? '✓ ' : '   '}${provider.name}`,
+      enabled: provider.key !== activeKey,
+      click: () => { void activateProviderFromTray(provider.key); }
+    }))
+    : [{ label: '暂无供应商', enabled: false }];
+  return [
+    { label: '打开 OpenTk', click: showMainWindow },
+    { type: 'separator' },
+    { label: '更改供应商', submenu: providerItems },
+    { type: 'separator' },
+    { label: '退出应用', click: () => { isQuitting = true; app.quit(); } }
+  ];
+}
+
+async function refreshTrayMenu() {
+  if (!tray) return;
+  try {
+    const configPath = findConfigPath();
+    const content = await fs.readFile(configPath, 'utf8');
+    const activeKey = activeConfigProvider(content);
+    const providers = readConfigProviders(content).map((provider) => ({ ...provider, active: provider.key === activeKey }));
+    tray.setContextMenu(Menu.buildFromTemplate(trayMenuTemplate(providers)));
+  } catch {
+    tray.setContextMenu(Menu.buildFromTemplate(trayMenuTemplate([])));
+  }
+}
+
+async function activateProviderFromTray(providerKey) {
+  try {
+    const configPath = findConfigPath();
+    const content = await fs.readFile(configPath, 'utf8');
+    const providers = readConfigProviders(content);
+    if (!providers.some((provider) => provider.key === providerKey)) throw new Error('供应商不存在');
+    const updated = setActiveConfigProvider(content, providerKey);
+    await saveConfig(configPath, updated);
+    await refreshTrayMenu();
+    mainWindow?.webContents.send('provider:changed', { providerKey });
+    const restart = await restartChatGPTProcess();
+    if (!restart.started) throw new Error('供应商已切换，但 ChatGPT/Codex 未能重新启动');
+  } catch (error) {
+    dialog.showErrorBox('更改供应商失败', error.message || String(error));
+  }
+}
+
 function ensureTray() {
   if (tray) return tray;
   try {
@@ -180,12 +267,9 @@ function ensureTray() {
     tray.setImage(icon);
     if (process.platform === 'darwin') tray.setTitle('');
     tray.setToolTip('OpenTk Codex配置工具');
-    tray.setContextMenu(Menu.buildFromTemplate([
-      { label: '打开 OpenTk', click: showMainWindow },
-      { type: 'separator' },
-      { label: '退出应用', click: () => { isQuitting = true; app.quit(); } }
-    ]));
+    tray.setContextMenu(Menu.buildFromTemplate(trayMenuTemplate([])));
     tray.on('click', showMainWindow);
+    void refreshTrayMenu();
     logTray('created');
     return tray;
   } catch (error) {
@@ -1235,9 +1319,7 @@ async function stopChatGPT() {
 
 let restartChatGPTPromise = null;
 
-ipcMain.handle('codex:restart', () => {
-  if (restartChatGPTPromise) return restartChatGPTPromise;
-  restartChatGPTPromise = (async () => {
+async function restartChatGPTProcess() {
     const runningChatGPT = await findRunningChatGPT();
     if (runningChatGPT) {
       if (!(await stopChatGPT())) {
@@ -1246,11 +1328,17 @@ ipcMain.handle('codex:restart', () => {
     }
     const startedChatGPT = await startChatGPT();
     return { restarted: startedChatGPT, started: startedChatGPT, processName: CHATGPT_PROCESS_NAME };
-  })().finally(() => {
+}
+
+function requestChatGPTRestart() {
+  if (restartChatGPTPromise) return restartChatGPTPromise;
+  restartChatGPTPromise = restartChatGPTProcess().finally(() => {
     restartChatGPTPromise = null;
   });
   return restartChatGPTPromise;
-});
+}
+
+ipcMain.handle('codex:restart', requestChatGPTRestart);
 ipcMain.handle('update:status', () => updateState);
 ipcMain.handle('update:check', checkForUpdates);
 ipcMain.handle('update:download', downloadUpdate);
