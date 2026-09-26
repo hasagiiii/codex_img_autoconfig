@@ -29,9 +29,9 @@
         </div>
 
         <nav class="nav-list" aria-label="主导航">
-          <div class="nav-section-title">Codex配置</div>
-          <button class="nav-item active" data-view="codex-view" aria-label="Codex配置" title="Codex配置">
-            <span class="nav-icon">⌘</span><span>Codex配置</span>
+          <div class="nav-section-title">管理</div>
+          <button class="nav-item active" data-view="providers-view" aria-label="供应商" title="供应商">
+            <span class="nav-icon">⌘</span><span>供应商</span>
           </button>
         </nav>
 
@@ -58,17 +58,36 @@
 
       <main class="main-content">
         <header class="page-header">
-          <div>
-            <h1 id="page-title">Codex配置</h1>
-            <p id="page-caption">读取和编辑本机 Codex 配置文件</p>
+          <div class="page-heading">
+            <button class="icon-button page-back-button hidden" id="back-to-providers" type="button" title="返回供应商列表" aria-label="返回供应商列表">←</button>
+            <div>
+              <h1 id="page-title">供应商</h1>
+              <p id="page-caption">选择供应商，或新增一个供应商配置</p>
+            </div>
           </div>
-          <div class="header-actions" id="file-actions">
+          <div class="header-actions hidden" id="file-actions">
             <button class="button button-secondary" id="choose-file">打开文件</button>
             <button class="button button-primary" id="save-config">保存配置</button>
           </div>
         </header>
 
-        <section class="view active" id="codex-view">
+        <section class="view active" id="providers-view">
+          <section class="provider-directory">
+            <header class="provider-directory-header">
+              <div>
+                <div class="section-kicker">供应商列表</div>
+                <h2>管理供应商</h2>
+                <p>选择供应商查看信息，点击“修改”进入配置编辑页面。</p>
+              </div>
+              <button class="button button-primary" id="add-provider" type="button">新增供应商</button>
+            </header>
+            <div class="provider-list" id="provider-list" aria-label="供应商列表">
+              <div class="file-list-loading">正在读取供应商...</div>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="codex-view">
           <section class="config-panel active" id="codex-panel">
             <div class="codex-layout">
               <aside class="file-inspector">
@@ -242,15 +261,33 @@
           </section>
 
           <section class="config-panel" id="oidc-panel">
-            <div class="settings-heading">
-              <div>
-                <h2>OIDC Provider</h2>
-                <p>使用 Authorization Code + PKCE，通过系统浏览器完成登录。</p>
+            <section class="oidc-provider-directory" id="oidc-provider-directory" aria-labelledby="oidc-provider-list-title">
+              <header class="oidc-provider-directory-header">
+                <div>
+                  <div class="section-kicker">OIDC Provider 列表</div>
+                  <h2 id="oidc-provider-list-title">身份 Provider</h2>
+                </div>
+                <button class="button button-secondary" id="add-oidc-provider" type="button">新增 Provider</button>
+              </header>
+              <div class="oidc-provider-list" id="oidc-provider-list" aria-label="OIDC Provider 列表"></div>
+            </section>
+            <div class="oidc-editor-block hidden" id="oidc-editor-block">
+              <div class="settings-heading">
+                <div class="settings-heading-title">
+                  <button class="icon-button page-back-button" id="back-to-oidc-providers" type="button" title="返回 Provider 列表" aria-label="返回 Provider 列表">←</button>
+                  <div>
+                    <h2>OIDC Provider</h2>
+                    <p>使用 Authorization Code + PKCE，通过系统浏览器完成登录。</p>
+                  </div>
+                </div>
+                <button class="button button-primary" id="save-oidc">保存 OIDC 配置</button>
               </div>
-              <button class="button button-primary" id="save-oidc">保存 OIDC 配置</button>
-            </div>
 
-            <form class="settings-form" id="oidc-form">
+              <form class="settings-form" id="oidc-form">
+              <label class="field field-wide">
+                <span>Provider 名称</span>
+                <input id="oidc-provider-name" type="text" placeholder="例如：OpenTk" autocomplete="off" />
+              </label>
               <label class="field field-wide">
                 <span>Issuer URL</span>
                 <input id="oidc-issuer" type="url" placeholder="https://opentk.ai" autocomplete="off" />
@@ -297,7 +334,8 @@
                   <button class="button button-primary hidden" id="install-update" type="button">重启并安装</button>
                 </div>
               </section>
-            </form>
+              </form>
+            </div>
           </section>
         </section>
 
@@ -336,6 +374,32 @@
             <button class="button button-secondary" id="cancel-model-cache" type="button">取消</button>
             <button class="button button-primary" id="confirm-model-cache" type="button">保存</button>
           </footer>
+        </dialog>
+
+        <dialog class="provider-dialog" id="provider-dialog" aria-labelledby="provider-dialog-title">
+          <header class="model-cache-header">
+            <strong id="provider-dialog-title">新增供应商</strong>
+            <button class="icon-button" id="close-provider-dialog" type="button" title="取消" aria-label="取消">×</button>
+          </header>
+          <form class="provider-dialog-form" id="provider-form">
+            <label class="field">
+              <span>供应商名称</span>
+              <input id="provider-name" type="text" placeholder="例如：OpenTk" autocomplete="off" />
+            </label>
+            <label class="field">
+              <span>供应商标识</span>
+              <input id="provider-key" type="text" placeholder="例如：opentk" autocomplete="off" spellcheck="false" />
+              <small>只允许字母、数字、下划线和短横线。</small>
+            </label>
+            <label class="field field-wide">
+              <span>Base URL</span>
+              <input id="provider-base-url" type="url" placeholder="https://example.com" autocomplete="off" />
+            </label>
+            <footer class="model-cache-actions">
+              <button class="button button-secondary" id="cancel-provider" type="button">取消</button>
+              <button class="button button-primary" id="confirm-provider" type="submit">新增并编辑</button>
+            </footer>
+          </form>
         </dialog>
 
         <dialog class="login-dialog" id="login-dialog" aria-labelledby="login-dialog-title">

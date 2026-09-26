@@ -435,26 +435,47 @@ async function readJson(filePath, fallback) {
 
 async function readOidcSettings() {
   const stored = await readJson(oidcSettingsPath(), {});
-  const storedRedirectUri = LEGACY_REDIRECT_URIS.has(stored.redirectUri)
-    ? DEFAULT_REDIRECT_URI
-    : stored.redirectUri;
-  const storedClientId = LEGACY_OIDC_CLIENT_IDS.has(stored.clientId)
-    ? DEFAULT_OIDC_SETTINGS.clientId
-    : stored.clientId;
-  const settings = {
-    issuer: String(stored.issuer || DEFAULT_OIDC_SETTINGS.issuer),
-    clientId: String(storedClientId || DEFAULT_OIDC_SETTINGS.clientId),
-    clientAuthMethod: 'none',
-    scopes: String(stored.scopes || DEFAULT_OIDC_SETTINGS.scopes),
-    redirectUri: storedRedirectUri || DEFAULT_REDIRECT_URI
+  const normalize = (input, id, fallbackName) => {
+    const storedRedirectUri = LEGACY_REDIRECT_URIS.has(input.redirectUri)
+      ? DEFAULT_REDIRECT_URI
+      : input.redirectUri;
+    const storedClientId = LEGACY_OIDC_CLIENT_IDS.has(input.clientId)
+      ? DEFAULT_OIDC_SETTINGS.clientId
+      : input.clientId;
+    return {
+      id: String(input.id || id),
+      name: String(input.name || fallbackName),
+      issuer: String(input.issuer || DEFAULT_OIDC_SETTINGS.issuer),
+      clientId: String(storedClientId || DEFAULT_OIDC_SETTINGS.clientId),
+      clientAuthMethod: 'none',
+      scopes: String(input.scopes || DEFAULT_OIDC_SETTINGS.scopes),
+      redirectUri: storedRedirectUri || DEFAULT_REDIRECT_URI
+    };
   };
-  const hasLegacySecret = Object.prototype.hasOwnProperty.call(stored, 'clientSecretProtected') ||
-    Object.prototype.hasOwnProperty.call(stored, 'clientSecret');
-  const migratedRedirectUri = typeof stored.redirectUri === 'string' && storedRedirectUri !== stored.redirectUri;
-  const migratedClientId = typeof stored.clientId === 'string' && storedClientId !== stored.clientId;
-  if (hasLegacySecret || (stored.clientAuthMethod && stored.clientAuthMethod !== 'none') || migratedRedirectUri || migratedClientId) {
+  const legacy = !Array.isArray(stored.providers);
+  const providers = (Array.isArray(stored.providers) ? stored.providers : [stored])
+    .filter((provider) => provider && typeof provider === 'object')
+    .map((provider, index) => normalize(provider, `provider-${index + 1}`, `OIDC Provider ${index + 1}`));
+  if (!providers.length) providers.push(normalize({}, 'default', '默认 Provider'));
+  const activeProviderId = providers.some((provider) => provider.id === stored.activeProviderId)
+    ? stored.activeProviderId
+    : providers[0].id;
+  const active = providers.find((provider) => provider.id === activeProviderId) || providers[0];
+  const settings = { ...active, providerId: active.id, providers };
+  const source = Array.isArray(stored.providers) ? stored.providers : [];
+  const legacyInput = legacy ? stored : {};
+  const hasLegacySecret = Object.prototype.hasOwnProperty.call(legacyInput, 'clientSecretProtected') ||
+    Object.prototype.hasOwnProperty.call(legacyInput, 'clientSecret');
+  const migratedRedirectUri = typeof legacyInput.redirectUri === 'string' &&
+    LEGACY_REDIRECT_URIS.has(legacyInput.redirectUri);
+  const migratedClientId = typeof legacyInput.clientId === 'string' &&
+    LEGACY_OIDC_CLIENT_IDS.has(legacyInput.clientId);
+  const needsMigration = hasLegacySecret || migratedRedirectUri || migratedClientId ||
+    (!legacy && (stored.activeProviderId !== active.id || source.length !== providers.length ||
+      source.some((provider, index) => JSON.stringify(provider) !== JSON.stringify(providers[index]))));
+  if (needsMigration) {
     await fs.mkdir(path.dirname(oidcSettingsPath()), { recursive: true });
-    await fs.writeFile(oidcSettingsPath(), JSON.stringify(settings, null, 2), 'utf8');
+    await fs.writeFile(oidcSettingsPath(), JSON.stringify({ ...active, activeProviderId: active.id, providers }, null, 2), 'utf8');
   }
   return settings;
 }
@@ -469,15 +490,24 @@ function validateRedirectUri(value) {
 }
 
 async function saveOidcSettings(input) {
+  const current = await readOidcSettings();
   const issuer = String(input.issuer || '').trim().replace(/\/$/, '');
   const clientId = String(input.clientId || '').trim();
   const scopes = String(input.scopes || DEFAULT_OIDC_SETTINGS.scopes).trim();
   const redirectUri = String(input.redirectUri || DEFAULT_REDIRECT_URI).trim();
+  const providerId = String(input.providerId || current.providerId || 'default').trim();
+  const name = String(input.name || current.name || 'OIDC Provider').trim();
 
   validateRedirectUri(redirectUri);
   if (issuer) new URL(issuer);
 
-  const stored = { issuer, clientId, clientAuthMethod: 'none', scopes, redirectUri };
+  const providers = (current.providers || []).map((provider) => provider.id === providerId
+    ? { id: providerId, name, issuer, clientId, clientAuthMethod: 'none', scopes, redirectUri }
+    : provider);
+  if (!providers.some((provider) => provider.id === providerId)) {
+    providers.push({ id: providerId, name, issuer, clientId, clientAuthMethod: 'none', scopes, redirectUri });
+  }
+  const stored = { activeProviderId: providerId, providers };
   await fs.mkdir(path.dirname(oidcSettingsPath()), { recursive: true });
   await fs.writeFile(oidcSettingsPath(), JSON.stringify(stored, null, 2), 'utf8');
   return readOidcSettings();

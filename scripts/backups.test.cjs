@@ -143,6 +143,40 @@ test('Base URL application separates a table header accidentally glued to the pr
   assert.doesNotMatch(output, /custom\.example" \[projects/);
 });
 
+test('provider application supports a non-custom provider key', () => {
+  const apply = configApply();
+  const input = '[model_providers.openai]\nname = "OpenAI"\nbase_url = "https://old.example"\n\n[model_providers.custom]\nname = "Keep"\n';
+  const output = apply.updateBaseUrl(
+    apply.updateTomlProvider(input, 'openai'),
+    'https://api.example.com',
+    'openai'
+  );
+  assert.match(output, /\[model_providers\.openai\][\s\S]*base_url = "https:\/\/api\.example\.com"/);
+  assert.match(output, /\[model_providers\.custom\]\nname = "Keep"/);
+});
+
+test('creating a provider adds name, base URL, and standard provider fields', () => {
+  const output = configApply().createTomlProvider('model = "keep"\n', 'sub2api', 'Sub2API', 'https://sub2api.example');
+  assert.match(output, /model = "keep"\n\n\[model_providers\.sub2api\]\nname = "Sub2API"/);
+  assert.match(output, /base_url = "https:\/\/sub2api\.example"/);
+  assert.match(output, /env_key = "OPENAI_API_KEY"/);
+});
+
+test('activating a provider updates the top-level active provider', () => {
+  const output = configApply().updateActiveProvider('model = "keep"\n[model_providers.custom]\n', 'openai');
+  assert.match(output, /^model_provider = "openai"\nmodel = "keep"/);
+  assert.match(output, /\[model_providers\.custom\]/);
+});
+
+test('provider model and env key updates stay inside the selected provider', () => {
+  const apply = configApply();
+  const input = '[model_providers.first]\nmodel = "one"\nenv_key = "OPENAI_API_KEY_FIRST"\n\n[model_providers.second]\nmodel = "two"\nenv_key = "OPENAI_API_KEY_SECOND"\n';
+  const output = apply.updateProviderEnvKey(apply.updateProviderModel(input, 'two-new', 'second'), 'second', 'OPENAI_API_KEY_SECOND');
+  assert.match(output, /\[model_providers\.first\]\nmodel = "one"\nenv_key = "OPENAI_API_KEY_FIRST"/);
+  assert.match(output, /\[model_providers\.second\]\nmodel = "two-new"\nenv_key = "OPENAI_API_KEY_SECOND"/);
+  assert.equal(apply.updateEnv('OPENAI_API_KEY_FIRST = one\nOPENAI_API_KEY_SECOND = two\n', 'new', 'OPENAI_API_KEY_SECOND'), 'OPENAI_API_KEY_FIRST = one\nOPENAI_API_KEY_SECOND = new\n');
+});
+
 test('opening backup switches inline editor and preserves current draft', async () => {
   const elements = new Map();
   function element(id) {

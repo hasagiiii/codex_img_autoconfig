@@ -6,9 +6,13 @@ const diffEditorFrame = document.querySelector('#diff-editor-frame');
 let diffView = null;
 
 let currentConfig = null;
+let currentProviderKey = 'custom';
+let activeProviderKey = '';
+let providers = [];
 let savedContent = '';
 let pendingEditorContent = null;
 let oidcSettings = null;
+let oidcEditingProviderId = '';
 let apiKeys = [];
 let backups = [];
 let configFiles = [];
@@ -81,6 +85,168 @@ function extractBaseUrl(content) {
   return match?.[1] || 'https://opentk.ai';
 }
 
+function parseProviders(content) {
+  const lines = String(content || '').split(/\r?\n/);
+  const headerPattern = /^\s*\[\s*model_providers\.([A-Za-z0-9_-]+)\s*\]\s*(?:#.*)?$/;
+  const tablePattern = /^\s*\[\[?[^\]]+\]\]?\s*(?:#.*)?$/;
+  const result = [];
+  lines.forEach((line, index) => {
+    const match = line.match(headerPattern);
+    if (!match) return;
+    let end = lines.findIndex((nextLine, nextIndex) => nextIndex > index && tablePattern.test(nextLine));
+    if (end < 0) end = lines.length;
+    const section = lines.slice(index + 1, end).join('\n');
+    const name = section.match(/^\s*name\s*=\s*["']([^"']*)["']/mi)?.[1] || match[1];
+    const baseUrl = section.match(/^\s*base_url\s*=\s*["']([^"']*)["']/mi)?.[1] || '';
+    result.push({ key: match[1], name, baseUrl });
+  });
+  return result;
+}
+
+function parseActiveProvider(content) {
+  return String(content || '').match(/^\s*model_provider\s*=\s*["']([A-Za-z0-9_-]+)["']/mi)?.[1] || '';
+}
+
+function providerByKey(key) {
+  return providers.find((provider) => provider.key === key) || null;
+}
+
+function renderProviders(content = editor.value) {
+  const list = document.querySelector('#provider-list');
+  providers = parseProviders(content);
+  list.innerHTML = '';
+  if (!providers.length) {
+    list.innerHTML = '<div class="file-list-loading">暂无供应商</div>';
+    return;
+  }
+  if (!providerByKey(currentProviderKey)) currentProviderKey = providers[0].key;
+  providers.forEach((provider) => {
+    const row = document.createElement('div');
+    row.className = `provider-list-row${provider.key === activeProviderKey ? ' active' : ''}${provider.key === currentProviderKey ? ' selected' : ''}`;
+    const select = document.createElement('button');
+    select.className = 'provider-list-select';
+    select.type = 'button';
+    select.title = provider.baseUrl ? `${provider.name} · ${provider.baseUrl}` : provider.name;
+    select.innerHTML = `<span class="provider-list-icon" aria-hidden="true">⌘</span><span class="provider-list-copy"><strong>${escapeHtml(provider.name)}</strong><small>${escapeHtml(provider.key)}${provider.baseUrl ? ` · ${escapeHtml(provider.baseUrl)}` : ''}</small></span>`;
+    select.addEventListener('click', () => { currentProviderKey = provider.key; renderProviders(editor.value); });
+    const enable = document.createElement('button');
+    enable.className = 'provider-list-enable';
+    enable.type = 'button';
+    enable.title = `启用 ${provider.name}`;
+    enable.setAttribute('aria-label', `启用 ${provider.name}`);
+    enable.textContent = provider.key === activeProviderKey ? '已启用' : '启用';
+    enable.disabled = provider.key === activeProviderKey;
+    enable.addEventListener('click', () => enableProvider(provider.key));
+    const edit = document.createElement('button');
+    edit.className = 'provider-list-edit';
+    edit.type = 'button';
+    edit.title = `修改 ${provider.name}`;
+    edit.setAttribute('aria-label', `修改 ${provider.name}`);
+    edit.textContent = '修改';
+    edit.addEventListener('click', () => openProviderEditor(provider.key));
+    const actions = document.createElement('div');
+    actions.className = 'provider-list-actions';
+    actions.append(enable, edit);
+    row.append(select, actions);
+    list.append(row);
+  });
+}
+
+function extractProviderBaseUrl(content, providerKey) {
+  const parsed = parseProviders(content).find((provider) => provider.key === providerKey);
+  return parsed?.baseUrl || extractBaseUrl(content);
+}
+
+async function openProviderEditor(providerKey) {
+  currentProviderKey = providerKey;
+  showView('codex-view');
+  const tomlFile = configFiles.find((file) => file.name === 'config.toml');
+  if (!tomlFile) {
+    showToast('没有找到 config.toml', true);
+    return false;
+  }
+  if (samePath(currentConfig?.path, tomlFile.path)) {
+    renderProviders(editor.value);
+    renderBaseUrl(extractProviderBaseUrl(editor.value, providerKey));
+    renderModel(extractProviderModel(editor.value, providerKey));
+    void loadCurrentProviderKey();
+    return true;
+  }
+  await loadConfig(() => api.config.read(tomlFile.path));
+  return true;
+}
+
+async function prepareProviderForApply(providerKey) {
+  currentProviderKey = providerKey;
+  const tomlFile = configFiles.find((file) => file.name === 'config.toml');
+  if (!tomlFile) throw new Error('没有找到 config.toml');
+  const source = await fileDraft(tomlFile);
+  renderProviders(source.content || '');
+  renderBaseUrl(extractProviderBaseUrl(source.content || '', providerKey));
+  renderModel(extractProviderModel(source.content || '', providerKey));
+  await loadCurrentProviderKey();
+}
+
+async function enableProvider(providerKey) {
+  try {
+    await prepareProviderForApply(providerKey);
+    const applyButton = document.querySelector('#apply-api-key');
+    if (applyButton.disabled) {
+      showToast('当前供应商尚未配置 API Key，请点击修改后填写', true);
+      return;
+    }
+    await applyApiKey();
+  } catch (error) {
+    showToast(`启用供应商失败：${error.message}`, true);
+  }
+}
+
+function openProviderDialog() {
+  const dialog = document.querySelector('#provider-dialog');
+  document.querySelector('#provider-name').value = '';
+  document.querySelector('#provider-key').value = '';
+  document.querySelector('#provider-base-url').value = 'https://opentk.ai';
+  if (!dialog.open) dialog.showModal();
+  document.querySelector('#provider-name').focus();
+}
+
+async function createProvider(event) {
+  event.preventDefault();
+  const name = document.querySelector('#provider-name').value.trim();
+  const key = document.querySelector('#provider-key').value.trim();
+  const baseUrl = document.querySelector('#provider-base-url').value.trim();
+  if (!name || !key || !baseUrl) {
+    showToast('请填写供应商名称、标识和 Base URL', true);
+    return;
+  }
+  if (providers.some((provider) => provider.key === key)) {
+    showToast('供应商标识已存在', true);
+    return;
+  }
+  const tomlFile = configFiles.find((file) => file.name === 'config.toml');
+  if (!tomlFile) {
+    showToast('没有找到 config.toml', true);
+    return;
+  }
+  const button = document.querySelector('#confirm-provider');
+  button.disabled = true;
+  try {
+    const source = await fileDraft(tomlFile);
+    const content = window.ConfigApply.createTomlProvider(source.content || '', key, name, baseUrl);
+    const result = await api.config.save(tomlFile.path, content);
+    drafts.set(tomlFile.path, { content, saved: content });
+    currentProviderKey = key;
+    document.querySelector('#provider-dialog').close();
+    await loadConfig(() => api.config.read(tomlFile.path));
+    await loadConfigFiles();
+    showToast(result.unchanged ? '供应商已存在，已进入编辑页面' : '供应商已新增');
+  } catch (error) {
+    showToast(`新增供应商失败：${error.message}`, true);
+  } finally {
+    button.disabled = false;
+  }
+}
+
 function extractModel(content) {
   const tablePattern = /^\s*\[\[?[^\]]+\]\]?\s*(?:#.*)?$/;
   for (const line of String(content || '').split(/\r?\n/)) {
@@ -89,6 +255,55 @@ function extractModel(content) {
     if (match) return match[1];
   }
   return '';
+}
+
+function extractProviderValue(content, providerKey, field) {
+  const lines = String(content || '').split(/\r?\n/);
+  const headerPattern = new RegExp(`^\\s*\\[\\s*model_providers\\.${providerKey}\\s*\\]\\s*(?:#.*)?$`);
+  const tablePattern = /^\s*\[\[?[^\]]+\]\]?\s*(?:#.*)?$/;
+  const start = lines.findIndex((line) => headerPattern.test(line));
+  if (start < 0) return '';
+  let end = lines.findIndex((line, index) => index > start && tablePattern.test(line));
+  if (end < 0) end = lines.length;
+  return lines.slice(start + 1, end).join('\n').match(new RegExp(`^\\s*${field}\\s*=\\s*["']([^"']*)["']`, 'mi'))?.[1] || '';
+}
+
+function generatedProviderEnvKey(providerKey) {
+  return `OPENAI_API_KEY_${String(providerKey).replace(/[^A-Za-z0-9]+/g, '_').toUpperCase()}`;
+}
+
+function providerEnvKey(content, providerKey) {
+  const configured = extractProviderValue(content, providerKey, 'env_key');
+  if (configured && (providerKey === 'custom' || configured !== 'OPENAI_API_KEY')) return configured;
+  return providerKey === 'custom' ? 'OPENAI_API_KEY' : generatedProviderEnvKey(providerKey);
+}
+
+function extractProviderModel(content, providerKey) {
+  return extractProviderValue(content, providerKey, 'model') || extractModel(content);
+}
+
+function parseDotenvValue(content, envKey) {
+  const escaped = envKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return String(content || '').match(new RegExp(`^\\s*(?:export\\s+)?${escaped}\\s*=\\s*(.*)$`, 'mi'))?.[1]?.trim() || '';
+}
+
+async function loadCurrentProviderKey() {
+  const tomlFile = configFiles.find((file) => file.name === 'config.toml');
+  if (!tomlFile) return;
+  const tomlSource = await fileDraft(tomlFile);
+  const envKey = providerEnvKey(tomlSource.content || '', currentProviderKey);
+  const envFile = configFiles.find((file) => file.name === '.env');
+  let value = '';
+  if (envFile) value = parseDotenvValue((await fileDraft(envFile)).content || '', envKey);
+  if (!value && envKey === 'OPENAI_API_KEY') {
+    try {
+      value = parseAuth(authDraft()?.content || '').OPENAI_API_KEY || '';
+    } catch {}
+  }
+  document.querySelector('#api-key-input').value = value;
+  document.querySelector('#manual-api-key').value = value;
+  document.querySelector('#apply-api-key').disabled = !value;
+  document.querySelector('#manual-key-status').textContent = value ? `当前变量：${envKey}` : `未配置变量：${envKey}`;
 }
 
 function renderBaseUrl(value) {
@@ -344,6 +559,10 @@ function setApiKeyMode(mode, touched = true) {
 }
 
 function syncManualKey() {
+  if (currentProviderKey !== 'custom') {
+    void loadCurrentProviderKey();
+    return;
+  }
   const input = document.querySelector('#manual-api-key');
   const comboInput = document.querySelector('#api-key-input');
   const status = document.querySelector('#manual-key-status');
@@ -376,6 +595,12 @@ function syncManualKey() {
 }
 
 function setManualKey(value) {
+  if (currentProviderKey !== 'custom') {
+    document.querySelector('#manual-api-key').value = value;
+    document.querySelector('#api-key-input').value = value;
+    document.querySelector('#apply-api-key').disabled = !value;
+    return;
+  }
   const draft = authDraft();
   if (!draft) return;
   try {
@@ -431,16 +656,21 @@ async function applyApiKey() {
     if (/\r|\n/.test(selectedModel)) throw new Error('模型不能包含换行符');
     baseUrl = selectedBaseUrl;
     model = selectedModel;
-    const authData = parseAuth(authSource.content);
-    authData.OPENAI_API_KEY = key;
-    let tomlContent = window.ConfigApply.updateTomlProvider(tomlSource.content || '');
-    tomlContent = window.ConfigApply.updateBaseUrl(tomlContent, selectedBaseUrl);
-    if (selectedModel) tomlContent = window.ConfigApply.updateModel(tomlContent, selectedModel);
+    const envKey = providerEnvKey(tomlSource.content || '', currentProviderKey);
+    let tomlContent = window.ConfigApply.updateTomlProvider(tomlSource.content || '', currentProviderKey);
+    tomlContent = window.ConfigApply.updateBaseUrl(tomlContent, selectedBaseUrl, currentProviderKey);
+    tomlContent = window.ConfigApply.updateProviderEnvKey(tomlContent, currentProviderKey, envKey);
+    tomlContent = window.ConfigApply.updateActiveProvider(tomlContent, currentProviderKey);
+    if (selectedModel) tomlContent = window.ConfigApply.updateProviderModel(tomlContent, selectedModel, currentProviderKey);
     const contents = new Map([
-      [authFile.path, `${JSON.stringify(authData, null, 2)}\n`],
       [tomlFile.path, tomlContent],
-      [envFile.path, window.ConfigApply.updateEnv(envSource.content || '', key)]
+      [envFile.path, window.ConfigApply.updateEnv(envSource.content || '', key, envKey)]
     ]);
+    if (currentProviderKey === 'custom' && envKey === 'OPENAI_API_KEY') {
+      const authData = parseAuth(authSource.content);
+      authData.OPENAI_API_KEY = key;
+      contents.set(authFile.path, `${JSON.stringify(authData, null, 2)}\n`);
+    }
     const results = new Map();
     for (const [path, content] of contents) results.set(path, await api.config.save(path, content));
     for (const [path, content] of contents) drafts.set(path, { content, saved: content });
@@ -453,6 +683,9 @@ async function applyApiKey() {
       renderConfig(updated);
     }
     await loadConfigFiles();
+    await loadCurrentProviderKey();
+    activeProviderKey = currentProviderKey;
+    renderProviders(tomlContent);
     syncManualKey();
     const changed = [...results.values()].some((result) => !result.unchanged);
     const restart = await api.codex.restart();
@@ -609,8 +842,11 @@ function renderConfig(config) {
     showPlainConfigEditor(editor.value);
   }
   if (config.name === 'config.toml' || /config\.toml$/i.test(config.path || '')) {
-    renderBaseUrl(extractBaseUrl(editor.value));
-    renderModel(extractModel(editor.value));
+    activeProviderKey = parseActiveProvider(editor.value);
+    renderProviders(editor.value);
+    renderBaseUrl(extractProviderBaseUrl(editor.value, currentProviderKey));
+    renderModel(extractProviderModel(editor.value, currentProviderKey));
+    void loadCurrentProviderKey();
     scheduleLoadProviderModels();
   }
   updateDirtyState();
@@ -816,6 +1052,10 @@ async function saveConfig() {
     document.querySelector('#config-state').textContent = '已保存';
     document.querySelector('#status-dot').classList.add('ready');
     updateDirtyState();
+    if (target === configFiles.find((file) => file.name === 'config.toml')?.path || /config\.toml$/i.test(target)) {
+      renderProviders(content);
+      renderBaseUrl(extractProviderBaseUrl(content, currentProviderKey));
+    }
     await loadConfigFiles();
     await loadBackups();
     showToast(result.unchanged ? '内容未变化，未创建备份' : (result.backupPath ? '配置已保存，并创建了备份' : '配置已保存'));
@@ -878,13 +1118,15 @@ function showView(viewId) {
   document.querySelectorAll('.view').forEach((view) => view.classList.toggle('active', view.id === viewId));
   document.querySelectorAll('[data-view]').forEach((item) => item.classList.toggle('active', item.dataset.view === viewId));
   const titles = {
-    'codex-view': ['Codex配置', '读取和编辑本机 Codex 配置文件'],
+    'providers-view': ['供应商', '选择供应商，或新增一个供应商配置'],
+    'codex-view': ['修改供应商', '编辑当前供应商的配置'],
     'oidc-view': ['配置', '管理 OIDC Provider 和登录参数']
   };
   const [title, caption] = titles[viewId] || titles['codex-view'];
   document.querySelector('#page-title').textContent = title;
   document.querySelector('#page-caption').textContent = caption;
   document.querySelector('#file-actions').classList.toggle('hidden', viewId !== 'codex-view');
+  document.querySelector('#back-to-providers').classList.toggle('hidden', viewId !== 'codex-view');
 }
 
 function showSettingsPanel(panelId) {
@@ -947,6 +1189,9 @@ function showLoginDialog() {
 
 function renderOidcSettings(settings) {
   oidcSettings = settings;
+  oidcEditingProviderId = settings.providerId || settings.providers?.[0]?.id || 'default';
+  renderOidcProviderList(settings);
+  document.querySelector('#oidc-provider-name').value = settings.name || '';
   document.querySelector('#oidc-issuer').value = settings.issuer || '';
   document.querySelector('#oidc-client-id').value = settings.clientId || '';
   document.querySelector('#oidc-scopes').value = settings.scopes || 'openid profile email offline_access sub2api:apikey';
@@ -957,14 +1202,74 @@ function renderOidcSettings(settings) {
   document.querySelector('#manual-login-button').classList.toggle('hidden', !settings.issuer);
 }
 
+function showOidcEditor(show) {
+  document.querySelector('#oidc-provider-directory').classList.toggle('hidden', show);
+  document.querySelector('#oidc-editor-block').classList.toggle('hidden', !show);
+}
+
+function renderOidcProviderList(settings) {
+  const list = document.querySelector('#oidc-provider-list');
+  list.innerHTML = '';
+  const providers = Array.isArray(settings.providers) ? settings.providers : [settings];
+  providers.forEach((provider) => {
+    const row = document.createElement('div');
+    row.className = `oidc-provider-row${provider.id === settings.providerId ? ' active' : ''}`;
+    const select = document.createElement('button');
+    select.className = 'oidc-provider-select';
+    select.type = 'button';
+    select.innerHTML = `<strong>${escapeHtml(provider.name || provider.id)}</strong><small>${escapeHtml(provider.issuer || '尚未配置')}</small>`;
+    select.addEventListener('click', () => openOidcEditor(provider));
+    const use = document.createElement('button');
+    use.className = 'oidc-provider-use';
+    use.type = 'button';
+    use.textContent = '修改';
+    use.addEventListener('click', () => openOidcEditor(provider));
+    row.append(select, use);
+    list.append(row);
+  });
+}
+
+async function selectOidcProvider(provider) {
+  try {
+    const settings = await api.oidc.saveSettings({ ...provider, providerId: provider.id });
+    renderOidcSettings(settings);
+    showToast(`已选择 ${provider.name || provider.id}`);
+  } catch (error) {
+    showToast(`切换 Provider 失败：${error.message}`, true);
+  }
+}
+
+function openOidcEditor(provider) {
+  oidcEditingProviderId = provider.id;
+  renderOidcSettings({ ...provider, providerId: provider.id, providers: oidcSettings?.providers || [provider] });
+  showOidcEditor(true);
+  document.querySelector('#oidc-provider-name').focus();
+}
+
+function startNewOidcProvider() {
+  oidcEditingProviderId = `provider-${Date.now()}`;
+  document.querySelector('#oidc-provider-name').value = '';
+  document.querySelector('#oidc-issuer').value = '';
+  document.querySelector('#oidc-client-id').value = '';
+  document.querySelector('#oidc-scopes').value = 'openid profile email offline_access sub2api:apikey';
+  document.querySelector('#oidc-redirect-uri').value = 'http://localhost:53777/oauth/callback';
+  showOidcEditor(true);
+  document.querySelector('#oidc-issuer').focus();
+}
+
 async function loadOidcSettings() {
-  try { renderOidcSettings(await api.oidc.readSettings()); }
+  try {
+    renderOidcSettings(await api.oidc.readSettings());
+    showOidcEditor(false);
+  }
   catch (error) { showToast(`OIDC 配置读取失败：${error.message}`, true); }
 }
 
 async function saveOidcSettings() {
   try {
     const settings = await api.oidc.saveSettings({
+      providerId: oidcEditingProviderId,
+      name: document.querySelector('#oidc-provider-name').value,
       issuer: document.querySelector('#oidc-issuer').value,
       clientId: document.querySelector('#oidc-client-id').value,
       scopes: document.querySelector('#oidc-scopes').value,
@@ -1082,6 +1387,11 @@ async function logout() {
 }
 
 document.querySelectorAll('[data-view]').forEach((item) => item.addEventListener('click', () => showView(item.dataset.view)));
+document.querySelector('#add-provider').addEventListener('click', openProviderDialog);
+document.querySelector('#back-to-providers').addEventListener('click', () => showView('providers-view'));
+document.querySelector('#provider-form').addEventListener('submit', createProvider);
+document.querySelector('#close-provider-dialog').addEventListener('click', () => document.querySelector('#provider-dialog').close());
+document.querySelector('#cancel-provider').addEventListener('click', () => document.querySelector('#provider-dialog').close());
 document.querySelectorAll('[data-settings-panel]').forEach((item) => item.addEventListener('click', () => {
   showSettingsPanel(item.dataset.settingsPanel);
 }));
@@ -1141,6 +1451,11 @@ document.querySelector('#choose-file').addEventListener('click', async () => {
   } catch (error) { showToast(`打开文件失败：${error.message}`, true); }
 });
 document.querySelector('#save-oidc').addEventListener('click', saveOidcSettings);
+document.querySelector('#add-oidc-provider').addEventListener('click', startNewOidcProvider);
+document.querySelector('#back-to-oidc-providers').addEventListener('click', () => {
+  showOidcEditor(false);
+  renderOidcProviderList(oidcSettings || {});
+});
 document.querySelector('#check-update').addEventListener('click', (event) => runUpdateAction(api.update.check, event.currentTarget));
 document.querySelector('#download-update').addEventListener('click', (event) => runUpdateAction(api.update.download, event.currentTarget));
 document.querySelector('#install-update').addEventListener('click', (event) => runUpdateAction(api.update.install, event.currentTarget));

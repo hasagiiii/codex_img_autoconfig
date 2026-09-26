@@ -76,6 +76,56 @@ test('model inputs provide filtered autocomplete suggestions', () => {
   assert.match(rendererStyles, /\.custom-model-menu \{ top: 34px;/);
 });
 
+test('sidebar provides supplier selection, editing, and creation', () => {
+  assert.match(rendererIndex, /data-view="providers-view"[^>]*aria-label="供应商"/);
+  assert.match(rendererIndex, /id="providers-view"/);
+  assert.match(rendererIndex, /id="provider-list"/);
+  assert.match(rendererIndex, /id="add-provider"/);
+  assert.match(rendererIndex, /id="provider-dialog"/);
+  assert.match(rendererIndex, /id="back-to-providers"/);
+  assert.match(rendererIndex, /class="icon-button page-back-button hidden" id="back-to-providers"/);
+  assert.match(rendererIndex, /title="返回供应商列表" aria-label="返回供应商列表">←<\/button>/);
+  assert.match(renderer, /function parseProviders\(content\)/);
+  assert.match(renderer, /function openProviderEditor\(providerKey\)/);
+  assert.match(renderer, /function createProvider\(event\)/);
+  assert.match(renderer, /currentProviderKey/);
+  assert.match(renderer, /renderProviders\(content\)/);
+  assert.match(renderer, /edit\.textContent = '修改'/);
+  assert.match(renderer, /function enableProvider\(providerKey\)/);
+  assert.match(renderer, /function prepareProviderForApply\(providerKey\)/);
+  assert.match(renderer, /await prepareProviderForApply\(providerKey\)/);
+  assert.doesNotMatch(renderer, /async function enableProvider\(providerKey\)[\s\S]*?await openProviderEditor\(providerKey\)/);
+  assert.match(renderer, /enable\.textContent = provider\.key === activeProviderKey \? '已启用' : '启用'/);
+  assert.match(renderer, /const parsed = parseProviders\(content\)\.find\(\(provider\) => provider\.key === providerKey\)/);
+  assert.match(renderer, /function providerEnvKey\(content, providerKey\)/);
+  assert.match(renderer, /updateProviderModel\(tomlContent, selectedModel, currentProviderKey\)/);
+  assert.match(renderer, /if \(currentProviderKey !== 'custom'\)/);
+  assert.match(rendererStyles, /\.provider-list-row/);
+  assert.match(rendererStyles, /\.provider-list-edit/);
+  assert.match(rendererStyles, /\.provider-list-enable/);
+  assert.match(rendererStyles, /\.provider-list \{ width: 100%; display: grid;/);
+  assert.match(rendererStyles, /\.provider-dialog-form \{ display: grid; grid-template-columns: minmax\(0, 1fr\);/);
+  assert.match(rendererStyles, /\.codex-layout \{ display: grid; grid-template-columns: 280px/);
+  assert.match(rendererStyles, /\.page-heading \{ display: flex; align-items: flex-start/);
+  assert.match(renderer, /back-to-providers/);
+  assert.match(renderer, /'providers-view': \['供应商'/);
+});
+
+test('OIDC settings support multiple providers and creation', () => {
+  assert.match(rendererIndex, /id="oidc-provider-list"/);
+  assert.match(rendererIndex, /id="add-oidc-provider"/);
+  assert.match(rendererIndex, /id="oidc-provider-name"/);
+  assert.match(rendererIndex, /id="oidc-editor-block"/);
+  assert.match(rendererIndex, /id="back-to-oidc-providers"/);
+  assert.match(renderer, /function renderOidcProviderList\(settings\)/);
+  assert.match(renderer, /function showOidcEditor\(show\)/);
+  assert.match(renderer, /function openOidcEditor\(provider\)/);
+  assert.match(renderer, /function selectOidcProvider\(provider\)/);
+  assert.match(renderer, /function startNewOidcProvider\(\)/);
+  assert.match(renderer, /providerId: oidcEditingProviderId/);
+  assert.match(rendererStyles, /\.oidc-provider-row/);
+});
+
 test('version tags publish a GitHub Release with repository token', () => {
   assert.match(workflow, /tags:\s*\n\s*- 'v\*'/);
   assert.match(workflow, /contents: write/);
@@ -101,7 +151,10 @@ test('macOS builds publish dmg and zip artifacts for both architectures', () => 
   assert.match(buildScript, /process\.platform !== 'darwin'/);
   assert.match(buildScript, /--publish/);
   assert.match(workflow, /runs-on: macos-latest/);
+  assert.match(workflow, /release-macos:\s+needs: release/);
   assert.match(workflow, /npm run release:mac/);
+  assert.match(workflow, /Publish macOS DMG and ZIP artifacts to the release/);
+  assert.match(workflow, /GH_TOKEN: \$\{\{ secrets\.GITHUB_TOKEN \}\}/);
 });
 
 test('application icon and user data directory use the supplied app identity', () => {

@@ -51,7 +51,7 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Publish macOS artifacts
+      - name: Publish macOS DMG and ZIP artifacts to the release
         run: npm run release:mac
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
