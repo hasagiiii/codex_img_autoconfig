@@ -27,8 +27,42 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Publish GitHub Release
-        run: npm run release:github
+      - name: Build Windows release artifacts
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-win.ps1 -Target all
+
+      - name: Verify Windows artifacts
+        shell: pwsh
+        run: |
+          $artifacts = @(Get-ChildItem -LiteralPath dist -File -Filter '*.exe')
+          if ($artifacts.Count -eq 0) {
+            throw 'No Windows executable artifacts were found in dist.'
+          }
+          $artifacts | ForEach-Object { Write-Host $_.FullName }
+
+      - name: Create GitHub Release
+        shell: bash
+        run: |
+          if ! gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$GITHUB_REF_NAME" \
+              --generate-notes
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Windows artifacts to the tagged release
+        shell: pwsh
+        run: |
+          $artifacts = @(Get-ChildItem -LiteralPath dist -File | Where-Object {
+            $_.Extension -in @('.exe', '.yml', '.blockmap')
+          })
+          foreach ($artifact in $artifacts) {
+            gh release upload $env:GITHUB_REF_NAME --repo $env:GITHUB_REPOSITORY --clobber $artifact.FullName
+            if ($LASTEXITCODE -ne 0) {
+              throw "Failed to upload $($artifact.Name)."
+            }
+          }
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -56,10 +90,18 @@ jobs:
 
       - name: Verify macOS artifacts
         run: |
-          test -n "$(find dist -maxdepth 1 -type f \( -name '*.dmg' -o -name '*.zip' \) -print -quit)"
-          find dist -maxdepth 1 -type f \( -name '*.dmg' -o -name '*.zip' \) -print
+          shopt -s nullglob
+          artifacts=(dist/*.dmg dist/*.zip)
+          if (( ${#artifacts[@]} == 0 )); then
+            echo 'No macOS DMG or ZIP artifacts were found in dist.' >&2
+            exit 1
+          fi
+          printf '%s\n' "${artifacts[@]}"
 
       - name: Upload macOS artifacts to the tagged release
-        run: gh release upload "$GITHUB_REF_NAME" dist/*.dmg dist/*.zip --clobber
+        run: |
+          shopt -s nullglob
+          artifacts=(dist/*.dmg dist/*.zip dist/*.yml dist/*.blockmap)
+          gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber "${artifacts[@]}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

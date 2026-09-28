@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-  [ValidateSet('portable', 'nsis')]
+  [ValidateSet('portable', 'nsis', 'all')]
   [string]$Target = 'portable',
 
   [ValidateSet('x64', 'arm64')]
@@ -22,13 +22,19 @@ Push-Location $projectRoot
 try {
   Write-Host "Building OpenTk Codex Config Tool ($Target, $Arch)..."
   $env:CSC_IDENTITY_AUTO_DISCOVERY = 'false'
-  $builderArguments = @('--win', $Target, "--$Arch")
+  if ($Target -eq 'all') {
+    $builderArguments = @('--win', 'nsis', 'portable', "--$Arch")
+  } else {
+    $builderArguments = @('--win', $Target, "--$Arch")
+  }
   if ($Publish) {
     if (-not $env:GH_TOKEN) {
       throw 'GH_TOKEN is required when -Publish is used.'
     }
     # A GitHub Release should contain both the installer and portable package.
     $builderArguments = @('--win', 'nsis', 'portable', "--$Arch", '--publish', 'always')
+  } else {
+    $builderArguments += @('--publish', 'never')
   }
   & $builder @builderArguments
   if ($LASTEXITCODE -ne 0) {

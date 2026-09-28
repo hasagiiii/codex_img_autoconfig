@@ -133,13 +133,18 @@ test('OIDC settings support multiple providers and creation', () => {
 test('version tags publish a GitHub Release with repository token', () => {
   assert.match(workflow, /tags:\s*\n\s*- 'v\*'/);
   assert.match(workflow, /contents: write/);
-  assert.match(workflow, /npm run release:github/);
+  assert.match(workflow, /gh release view "\$GITHUB_REF_NAME" --repo "\$GITHUB_REPOSITORY"/);
+  assert.match(workflow, /gh release create "\$GITHUB_REF_NAME"/);
+  assert.match(workflow, /\.blockmap/);
+  assert.match(workflow, /\.yml/);
   assert.match(workflow, /GH_TOKEN: \$\{\{ secrets\.GITHUB_TOKEN \}\}/);
 });
 
 test('GitHub publishing builds installer and portable artifacts', () => {
   const buildScript = fs.readFileSync(path.join(root, 'scripts', 'build-win.ps1'), 'utf8');
   assert.ok(buildScript.includes("@('--win', 'nsis', 'portable'"));
+  assert.match(buildScript, /ValidateSet\('portable', 'nsis', 'all'\)/);
+  assert.match(buildScript, /'--publish', 'never'/);
   assert.ok(packageJson.build.nsis);
   assert.ok(packageJson.build.portable);
 });
@@ -162,12 +167,17 @@ test('macOS builds publish dmg and zip artifacts for both architectures', () => 
   ]);
   assert.match(buildScript, /process\.platform !== 'darwin'/);
   assert.match(buildScript, /--publish/);
+  assert.match(buildScript, /args\.push\('--publish', 'never'\)/);
   assert.match(workflow, /runs-on: macos-latest/);
   assert.match(workflow, /release-macos:\s+needs: release/);
+  assert.match(workflow, /Create GitHub Release/);
+  assert.match(workflow, /gh release create/);
+  assert.match(workflow, /Upload Windows artifacts to the tagged release/);
   assert.match(workflow, /npm run build:mac/);
   assert.match(workflow, /Build macOS DMG and ZIP artifacts/);
   assert.match(workflow, /Verify macOS artifacts/);
-  assert.match(workflow, /gh release upload "\$GITHUB_REF_NAME" dist\/\*\.dmg dist\/\*\.zip --clobber/);
+  assert.match(workflow, /dist\/\*\.dmg dist\/\*\.zip dist\/\*\.yml dist\/\*\.blockmap/);
+  assert.match(workflow, /gh release upload "\$GITHUB_REF_NAME" --repo "\$GITHUB_REPOSITORY" --clobber/);
   assert.match(workflow, /GH_TOKEN: \$\{\{ secrets\.GITHUB_TOKEN \}\}/);
 });
 

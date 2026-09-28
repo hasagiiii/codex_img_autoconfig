@@ -19,6 +19,8 @@ const args = ['--mac', 'dmg', 'zip', '--x64', '--arm64'];
 if (publish) {
   if (!process.env.GH_TOKEN) throw new Error('GH_TOKEN is required when --publish is used.');
   args.push('--publish', 'always');
+} else {
+  args.push('--publish', 'never');
 }
 
 const result = spawnSync(builder, args, {
