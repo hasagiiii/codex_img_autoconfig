@@ -51,7 +51,15 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Publish macOS DMG and ZIP artifacts to the release
-        run: npm run release:mac
+      - name: Build macOS DMG and ZIP artifacts
+        run: npm run build:mac
+
+      - name: Verify macOS artifacts
+        run: |
+          test -n "$(find dist -maxdepth 1 -type f \( -name '*.dmg' -o -name '*.zip' \) -print -quit)"
+          find dist -maxdepth 1 -type f \( -name '*.dmg' -o -name '*.zip' \) -print
+
+      - name: Upload macOS artifacts to the tagged release
+        run: gh release upload "$GITHUB_REF_NAME" dist/*.dmg dist/*.zip --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

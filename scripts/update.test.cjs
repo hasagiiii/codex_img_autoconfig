@@ -164,8 +164,10 @@ test('macOS builds publish dmg and zip artifacts for both architectures', () => 
   assert.match(buildScript, /--publish/);
   assert.match(workflow, /runs-on: macos-latest/);
   assert.match(workflow, /release-macos:\s+needs: release/);
-  assert.match(workflow, /npm run release:mac/);
-  assert.match(workflow, /Publish macOS DMG and ZIP artifacts to the release/);
+  assert.match(workflow, /npm run build:mac/);
+  assert.match(workflow, /Build macOS DMG and ZIP artifacts/);
+  assert.match(workflow, /Verify macOS artifacts/);
+  assert.match(workflow, /gh release upload "\$GITHUB_REF_NAME" dist\/\*\.dmg dist\/\*\.zip --clobber/);
   assert.match(workflow, /GH_TOKEN: \$\{\{ secrets\.GITHUB_TOKEN \}\}/);
 });
 
